@@ -3,11 +3,11 @@ import { createRouter, createWebHistory } from 'vue-router';
 const router = createRouter({
     history: createWebHistory(),
     routes: [
-        // {
-        //   path: '/',
-        //   name: 'dashboard',
-        //   component: () => import('../pages/Dashboard.vue'),
-        // },
+        {
+            path: '/',
+            name: 'dashboard',
+            component: () => import('@/pages/Dashboard.vue'),
+        },
         // {
         //   path: '/series',
         //   name: 'series',
@@ -33,11 +33,11 @@ const router = createRouter({
         //   name: 'settings',
         //   component: () => import('../pages/Settings.vue'),
         // },
-        // {
-        //   path: '/:pathMatch(.*)*',
-        //   name: 'not-found',
-        //   component: () => import('../pages/NotFound.vue'),
-        // },
+        {
+            path: '/:pathMatch(.*)*',
+            name: 'not-found',
+            component: () => import('../pages/NotFound.vue'),
+        },
     ],
 });
 

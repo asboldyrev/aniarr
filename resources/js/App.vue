@@ -1,10 +1,11 @@
 <template>
-    <div className="flex min-h-screen w-full flex-col bg-background md:flex-row">
+    <div class="flex min-h-screen w-full flex-col bg-background md:flex-row" :class="{ dark: isDark }">
         <!-- <MobileNav onAddClick={() => setAddDialogOpen(true)} /> -->
+        <Sidebar />
         <!-- <AppSidebar onAddClick={() => setAddDialogOpen(true)} /> -->
         <main className="flex-1 overflow-auto">
             <!-- <Outlet /> -->
-            <EmptyState :icon="RiTvLine" title="Нет добавленных сериалов" description="Добавьте первый сериал, чтобы начать отслеживание обновлений и автоматическую загрузку" />
+            <RouterView />
         </main>
         <!-- <AddSeriesDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} /> -->
     </div>
@@ -12,7 +13,14 @@
 </template>
 
 <script setup>
-    import EmptyState from './components/EmptyState.vue';
-    import { RiTvLine } from '@remixicon/vue';
+    import Sidebar from '@/components/Sidebar.vue';
+    import useThemeStore from '@/stores/ThemeStore';
+    import { computed } from 'vue';
+
+    const themeStore = useThemeStore()
+
+    const isDark = computed(() => {
+        return themeStore.isDark()
+    })
 
 </script>
