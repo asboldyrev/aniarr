@@ -23,11 +23,11 @@ const router = createRouter({
             name: 'downloads',
             component: () => import('../pages/ActiveDownloads.vue'),
         },
-        // {
-        //   path: '/errors',
-        //   name: 'errors',
-        //   component: () => import('../pages/Errors.vue'),
-        // },
+        {
+            path: '/errors',
+            name: 'errors',
+            component: () => import('../pages/Errors.vue'),
+        },
         // {
         //   path: '/settings',
         //   name: 'settings',
