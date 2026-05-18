@@ -28,11 +28,11 @@ const router = createRouter({
             name: 'errors',
             component: () => import('../pages/Errors.vue'),
         },
-        // {
-        //   path: '/settings',
-        //   name: 'settings',
-        //   component: () => import('../pages/Settings.vue'),
-        // },
+        {
+            path: '/settings',
+            name: 'settings',
+            component: () => import('../pages/Settings.vue'),
+        },
         {
             path: '/:pathMatch(.*)*',
             name: 'not-found',
