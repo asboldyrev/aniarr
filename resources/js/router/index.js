@@ -13,11 +13,11 @@ const router = createRouter({
         //   name: 'series',
         //   component: () => import('../pages/SeriesIndex.vue'),
         // },
-        // {
-        //   path: '/series/:id',
-        //   name: 'series-detail',
-        //   component: () => import('../pages/SeriesDetail.vue'),
-        // },
+        {
+            path: '/series/:id',
+            name: 'series-detail',
+            component: () => import('../pages/SeriesDetail.vue'),
+        },
         {
             path: '/downloads',
             name: 'downloads',
