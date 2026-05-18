@@ -18,11 +18,11 @@ const router = createRouter({
         //   name: 'series-detail',
         //   component: () => import('../pages/SeriesDetail.vue'),
         // },
-        // {
-        //   path: '/downloads',
-        //   name: 'downloads',
-        //   component: () => import('../pages/ActiveDownloads.vue'),
-        // },
+        {
+            path: '/downloads',
+            name: 'downloads',
+            component: () => import('../pages/ActiveDownloads.vue'),
+        },
         // {
         //   path: '/errors',
         //   name: 'errors',
