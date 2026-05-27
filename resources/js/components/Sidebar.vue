@@ -11,7 +11,7 @@
 
         <!-- Add Button -->
         <div class="p-4">
-            <Button @click="props.onAddClick" :class="cn('cursor-pointer w-full gap-2', collapsed && 'px-2')">
+            <Button @click="$emit('onAddClick')" :class="cn('cursor-pointer w-full gap-2', collapsed && 'px-2')">
                 <PlusCircle class="h-4 w-4" />
                 <span v-if="!collapsed">Добавить сериал</span>
             </Button>
@@ -65,6 +65,7 @@
     import { useRoute, useRouter } from 'vue-router';
 
     const props = defineProps()
+    defineEmits(['onAddClick'])
 
     const route = useRoute()
     const router = useRouter()
