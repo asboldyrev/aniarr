@@ -103,7 +103,7 @@
 
     const classes = computed(() => {
         const width = collapsed.value ? 'w-16' : 'w-64'
-        return cn('sticky top-0 h-screen flex-col border-r bg-card transition-all duration-300 md:flex ' + width)
+        return cn('sticky top-0 hidden h-screen flex-col border-r bg-card transition-all duration-300 md:flex ' + width)
     })
 
     // Функция для проверки активного маршрута
