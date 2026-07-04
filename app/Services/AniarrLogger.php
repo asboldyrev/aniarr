@@ -4,18 +4,30 @@ namespace App\Services;
 
 use App\Enums\LogType;
 use App\Exceptions\BadMethodCallException;
-use Illuminate\Support\Facades\Log;
-use Throwable;
+use App\Models\Series;
+use Exception;
 
 /**
- * @method static void error(string $message, array $context = [])
- * @method static void warning(string $message, array $context = [])
- * @method static void success(string $message, array $context = [])
- * @method static void info(string $message, array $context = [])
+ * @method void error(string $message, array $context = [])
+ * @method void warning(string $message, array $context = [])
+ * @method void success(string $message, array $context = [])
+ * @method void info(string $message, array $context = [])
  */
-class AniarrLogger
+final class AniarrLogger
 {
-    public static function __callStatic(string $name, array $arguments)
+    protected Series|null $series;
+
+    public function setSeries(Series|int $id): void
+    {
+        $this->series = Series::query()->find($id);
+    }
+
+    public function resetSeries(): void
+    {
+        $this->series = null;
+    }
+
+    public function __call(string $name, array $arguments)
     {
         $message = array_shift($arguments);
         $context = count($arguments) ? array_shift($arguments) : [];
@@ -26,16 +38,14 @@ class AniarrLogger
             throw new BadMethodCallException("Unknown log type: {$name}");
         }
 
-        self::log($type, $message, $context);
+        $this->log($type, $message, $context);
     }
 
     /**
      * Записать сообщение в канал aniarr с указанным уровнем.
      */
-    public static function log(LogType $level, string $message, array $context = []): void
+    public function log(LogType $level, string $message, array $context = []): void
     {
-        // TODO добавить логирование в БД
-
         $formatted = sprintf(
             "[%s] %s: %s %s\n",
             now()->format('Y-m-d H:i:s'),
@@ -46,32 +56,31 @@ class AniarrLogger
                 : ''
         );
 
+        if (!empty($this->series)) {
+            $this->series->activityLogs()->create([
+                'message' => $message,
+                'type' => $level,
+            ]);
+        }
+
         $logPath = storage_path('logs/aniarr.log');
 
         file_put_contents($logPath, $formatted, FILE_APPEND | LOCK_EX);
     }
 
     /**
-     * Записать ошибку неудачного HTTP-запроса.
+     * Записать ошибку исключения
      */
-    public static function failedRequest(string $url, string $error): void
+    public function exception(Exception $exception, string|null $url = null): void
     {
-        self::error(sprintf(
-            'Запрос: %s не выполнен. Ошибка: %s',
-            $url,
-            $error,
-        ));
-    }
+        if ($url) {
+            $context['url'] = $url;
+        }
 
-    /**
-     * Записать ошибку исключения при выполнении HTTP-запроса.
-     */
-    public static function requestException(string $url, Throwable $exception): void
-    {
-        self::error(sprintf(
-            'Запрос: %s не выполнен. Ошибка: %s',
-            $url,
-            $exception->getMessage()
-        ));
+        $context['code'] = $exception->getCode();
+        $context['file'] = $exception->getFile();
+        $context['line'] = $exception->getLine();
+
+        $this->error($exception->getMessage(), $context);
     }
 }

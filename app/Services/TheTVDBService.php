@@ -32,7 +32,7 @@ class TheTVDBService extends BaseApiService
 
                 return [];
             } catch (\Exception $e) {
-                // TODO: Логировать ошибку
+                app(AniarrLogger::class)->exception($e);
                 return [];
             }
         });
@@ -136,6 +136,7 @@ class TheTVDBService extends BaseApiService
 
             return false;
         } catch (\Exception $e) {
+            app(AniarrLogger::class)->exception($e);
             return false;
         }
     }
@@ -187,7 +188,7 @@ class TheTVDBService extends BaseApiService
 
                 return [];
             } catch (\Exception $e) {
-                // TODO: Логировать ошибку
+                app(AniarrLogger::class)->exception($e);
                 return [];
             }
         });

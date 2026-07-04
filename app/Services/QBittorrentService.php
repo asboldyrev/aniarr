@@ -272,7 +272,7 @@ class QBittorrentService extends BaseApiService
     protected function request(string $method, string $endpoint, array $options = []): Response
     {
         if (empty($this->baseUrl)) {
-            throw new BaseUrlNotConfigured('Base URL не настроен');
+            throw new BaseUrlNotConfigured('Base URL для QBittorrent не настроен');
         }
 
         $url = rtrim($this->baseUrl, '/') . '/' . ltrim($endpoint, '/');

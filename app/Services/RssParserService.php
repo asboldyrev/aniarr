@@ -9,6 +9,7 @@ use App\Dto\PendingAniarrLog;
 use App\Enums\LogType;
 use App\Models\Series;
 use App\Models\Torrent;
+use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
@@ -27,35 +28,15 @@ class RssParserService
             $response = Http::timeout(30)->get($url);
 
             if ($response->failed()) {
-                return new FeedParseResult(
-                    items: [],
-                    logs: [
-                        new PendingAniarrLog(
-                            LogType::ERROR,
-                            'Запрос RSS-ленты завершился ошибкой',
-                            [
-                                'status' => $response->status(),
-                            ]
-                        ),
-                    ],
-                );
+                app(AniarrLogger::class)->error('Запрос RSS-ленты завершился ошибкой: ' . $response->status());
+                return new FeedParseResult([]);
             }
 
             $xml = simplexml_load_string($response->body(), 'SimpleXMLElement', LIBXML_NOCDATA);
 
             if ($xml === false) {
-                return new FeedParseResult(
-                    items: [],
-                    logs: [
-                        new PendingAniarrLog(
-                            LogType::ERROR,
-                            'Ошибка парсинга RSS-ленты',
-                            [
-                                'status' => $response->status(),
-                            ]
-                        ),
-                    ],
-                );
+                app(AniarrLogger::class)->error('Ошибка парсинга RSS-ленты: ' . $response->status());
+                return new FeedParseResult([]);
             }
 
             $items = [];
@@ -68,18 +49,8 @@ class RssParserService
 
             return new FeedParseResult(items: $items);
         } catch (\Exception $e) {
-            return new FeedParseResult(
-                items: [],
-                logs: [
-                    new PendingAniarrLog(
-                        LogType::ERROR,
-                        'Exception parsing RSS feed',
-                        [
-                            'error' => $e->getMessage(),
-                        ]
-                    ),
-                ],
-            );
+            app(AniarrLogger::class)->exception($e);
+            return new FeedParseResult([]);
         }
     }
 
@@ -172,8 +143,8 @@ class RssParserService
                 $metadata->episodes,
                 $metadata->quality,
             );
-        } catch (\Exception $e) {
-            Log::warning("Failed to parse RSS item", ['error' => $e->getMessage()]);
+        } catch (Exception $e) {
+            app(AniarrLogger::class)->exception($e);
             return null;
         }
     }

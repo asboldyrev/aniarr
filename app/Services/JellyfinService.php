@@ -43,7 +43,7 @@ class JellyfinService extends BaseApiService
             $response = $this->getSystemInfo();
             return $response->successful();
         } catch (\Exception $e) {
-            Log::error('Jellyfin connection test failed: ' . $e->getMessage());
+            app(AniarrLogger::class)->exception($e);
             return false;
         }
     }
