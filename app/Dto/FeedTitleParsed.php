@@ -5,10 +5,9 @@ namespace App\Dto;
 class FeedTitleParsed
 {
     public function __construct(
-        readonly string $codec,
-        readonly array $episodes,
-        readonly string $quality,
-    ) {
-        // throw new \Exception('Not implemented');
-    }
+        public readonly string $title,
+        public readonly string $codec,
+        public readonly array $episodes,
+        public readonly string $quality,
+    ) {}
 }

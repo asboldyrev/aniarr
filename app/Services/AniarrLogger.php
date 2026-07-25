@@ -5,13 +5,14 @@ namespace App\Services;
 use App\Enums\LogType;
 use App\Exceptions\BadMethodCallException;
 use App\Models\Series;
+use Error;
 use Exception;
 
 /**
- * @method void error(string $message, array $context = [])
- * @method void warning(string $message, array $context = [])
- * @method void success(string $message, array $context = [])
- * @method void info(string $message, array $context = [])
+ * @method void error(string $message, Exception|Error|array $context = [])
+ * @method void warning(string $message, Exception|Error|array $context = [])
+ * @method void success(string $message, Exception|Error|array $context = [])
+ * @method void info(string $message, Exception|Error|array $context = [])
  */
 final class AniarrLogger
 {
@@ -44,17 +45,33 @@ final class AniarrLogger
     /**
      * Записать сообщение в канал aniarr с указанным уровнем.
      */
-    public function log(LogType $level, string $message, array $context = []): void
+    public function log(LogType $level, string $message, Exception|Error|array $context = []): void
     {
-        $formatted = sprintf(
-            "[%s] %s: %s %s\n",
-            now()->format('Y-m-d H:i:s'),
-            $level->name,
-            $message,
-            !empty($context)
-                ? json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
-                : ''
-        );
+        if (is_array($context) && !empty($context)) {
+            $context = json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        } elseif (is_array($context)) {
+            $context = '';
+        } else {
+            $context = implode("\n", $this->exceptionToContext($context));
+        }
+
+        if ($context) {
+            $formatted = sprintf(
+                "[%s] %s: %s\n%s\n",
+                now()->format('Y-m-d H:i:s'),
+                $level->name,
+                $message,
+                $context
+            );
+        } else {
+            $formatted = sprintf(
+                "[%s] %s: %s",
+                now()->format('Y-m-d H:i:s'),
+                $level->name,
+                $message
+            );
+        }
+
 
         if (!empty($this->series)) {
             $this->series->activityLogs()->create([
@@ -65,7 +82,7 @@ final class AniarrLogger
 
         $logPath = storage_path('logs/aniarr.log');
 
-        file_put_contents($logPath, $formatted, FILE_APPEND | LOCK_EX);
+        file_put_contents($logPath, "$formatted\n", FILE_APPEND | LOCK_EX);
     }
 
     /**
@@ -77,10 +94,22 @@ final class AniarrLogger
             $context['url'] = $url;
         }
 
-        $context['code'] = $exception->getCode();
-        $context['file'] = $exception->getFile();
-        $context['line'] = $exception->getLine();
+        $context['exception'] = implode("\n", $this->exceptionToContext($exception, short: true));
 
-        $this->error($exception->getMessage(), $context);
+        $this->error("Code: {$exception->getCode()}, {$exception->getMessage()}", $context);
+    }
+
+    private function exceptionToContext(Exception|Error $exception, bool $short = false): array
+    {
+        $result = [
+            "{$exception->getFile()}: {$exception->getLine()}",
+            $exception->getTraceAsString(),
+        ];
+
+        if (!$short) {
+            array_unshift($result, "{$exception->getMessage()}. Code: {$exception->getCode()}");
+        }
+
+        return $result;
     }
 }

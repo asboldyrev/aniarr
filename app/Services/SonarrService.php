@@ -20,6 +20,14 @@ class SonarrService extends BaseApiService
         return is_array($data) ? $data : [];
     }
 
+    public function hasSeries(int $tvdbId): int|null
+    {
+        $response = $this->get('series', ['tvdbId' => $tvdbId]);
+        $data = $response->successful() ? $response->json() : null;
+
+        return is_array($data) && !empty($data);
+    }
+
     /**
      * Найти аниме по tvdb_id
      */
@@ -45,11 +53,24 @@ class SonarrService extends BaseApiService
     }
 
     /**
+     * Добавить сериал в Sonarr по данным lookup (rootFolderPath и qualityProfileId обязательны)
+     */
+    public function addSeriesFromLookup(array $lookupSeries, string $rootFolderPath, int $qualityProfileId): ?array
+    {
+        $payload = $lookupSeries;
+        $payload['rootFolderPath'] = $rootFolderPath;
+        $payload['qualityProfileId'] = $qualityProfileId;
+        $payload['monitored'] = $payload['monitored'] ?? true;
+        $payload['addOptions'] = $payload['addOptions'] ?? ['searchForMissingEpisodes' => false];
+        return $this->addSeries($payload);
+    }
+
+    /**
      * Получить список серий для аниме
      */
     public function getEpisodes(int $seriesId): array
     {
-        $response = $this->get('episode', ['seriesId' => $seriesId]);
+        $response = $this->get('episode', ['seriesId' => $seriesId, 'includeEpisodeFile' => 'true']);
         $data = $response->successful() ? $response->json() : null;
         return is_array($data) ? $data : [];
     }
@@ -78,6 +99,26 @@ class SonarrService extends BaseApiService
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+    /**
+     * Получить профили качества Sonarr
+     */
+    public function getQualityProfiles(): array
+    {
+        $response = $this->get('qualityProfile');
+        $data = $response->successful() ? $response->json() : null;
+        return is_array($data) ? $data : [];
+    }
+
+    /**
+     * Получить корневые папки Sonarr
+     */
+    public function getRootFolders(): array
+    {
+        $response = $this->get('rootFolder');
+        $data = $response->successful() ? $response->json() : null;
+        return is_array($data) ? $data : [];
     }
 
     /**

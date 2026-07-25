@@ -13,6 +13,35 @@ class TheTVDBService extends BaseApiService
     protected ?string $token = null;
     protected string $locale = 'eng';
 
+    public function getSeries(int|string $id): array
+    {
+        $cacheKey = "thetvdb:getSeries:" . md5($id . ':' . $this->locale);
+
+        return Cache::remember($cacheKey, 3600, function () use ($id) {
+            try {
+                $response = $this->get('series/' . $id);
+                $translation = $this->get(sprintf('series/%s/translations/%s', $id, $this->locale));
+
+                if ($response->successful() && $translation->successful()) {
+                    $data = $response->json('data');
+
+                    if (empty($data)) {
+                        return [];
+                    }
+
+                    $data['translation'] = $translation->json('data');
+
+                    return $data;
+                }
+
+                return [];
+            } catch (\Exception $e) {
+                app(AniarrLogger::class)->exception($e);
+                return [];
+            }
+        });
+    }
+
     public function search(string $query, string $type = 'series'): array
     {
         $cacheKey = "thetvdb:search:" . md5(Str::slug($query) . ':' . $type . ':' . $this->locale);
@@ -43,7 +72,7 @@ class TheTVDBService extends BaseApiService
      */
     public function getPoster(int $seriesId, string|null $lang = null): ?string
     {
-        $lang = $lang ?? $this->locale;
+        $lang = $lang ?: $this->locale;
         $images = $this->getImages($seriesId, 'poster', $lang);
 
         if (!empty($images)) {
@@ -76,6 +105,10 @@ class TheTVDBService extends BaseApiService
             if (isset($firstImage['id'])) {
                 return "https://artworks.thetvdb.com/banners/{$firstImage['id']}";
             }
+
+            if (!empty($images['image'])) {
+                return $images['image'];
+            }
         }
 
         return null;
@@ -94,11 +127,15 @@ class TheTVDBService extends BaseApiService
 
         $appLocale = config('app.locale', 'en');
         $this->locale = $this->convertLocaleToTheTVDB($appLocale);
+
+        $this->login();
     }
 
     public function getHeaders(): array
     {
-        return [];
+        return [
+            'Authorization' => 'Bearer ' . $this->token
+        ];
     }
 
     /**

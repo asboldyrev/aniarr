@@ -132,7 +132,7 @@ class RssParserService
             }
 
             return new FeedItemParsed(
-                $title,
+                $metadata->title,
                 $guid,
                 $torrentUrl,
                 $torrentId,
@@ -159,29 +159,20 @@ class RssParserService
     {
         // Remove CDATA wrapper if present
         $title = trim($title);
+        $data = explode(' | ', $title);
 
-        // Extract codec (HEVC or AVC)
-        $codec = null;
-        if (stripos($title, 'HEVC') !== false || stripos($title, 'x265') !== false) {
-            $codec = 'HEVC';
-        } elseif (stripos($title, 'AVC') !== false || stripos($title, 'x264') !== false) {
-            $codec = 'AVC';
+        if (count($data) != 4) {
+            return null;
         }
+
+        $codec = trim($data[2]);
 
         if (!$codec) {
             return null; // Not a valid anime release
         }
 
-        // Extract episode range (e.g., "1-12" or "5")
-        $episodes = [];
-        if (preg_match('/\|\s*(\d+)(?:-(\d+))?\s*\|?$/', $title, $matches)) {
-            $start = (int) $matches[1];
-            $end = isset($matches[2]) ? (int) $matches[2] : $start;
-
-            for ($i = $start; $i <= $end; $i++) {
-                $episodes[] = $i;
-            }
-        }
+        $range = explode('-', $data[3]);
+        $episodes = range($range[0], $range[1]);
 
         if (empty($episodes)) {
             return null;
@@ -189,14 +180,16 @@ class RssParserService
 
         // Extract quality
         $quality = '1080p';
-        if (stripos($title, '720p') !== false) {
+        if (stripos($data[1], '720p') !== false) {
             $quality = '720p';
-        } elseif (stripos($title, '1080p') !== false) {
+        } elseif (stripos($data[1], '1080p') !== false) {
             $quality = '1080p';
-        } elseif (stripos($title, '2160p') !== false || stripos($title, '4K') !== false) {
+        } elseif (stripos($data[1], '2160p') !== false || stripos($data[1], '4K') !== false) {
             $quality = '2160p';
         }
 
-        return new FeedTitleParsed($codec, $episodes, $quality);
+        $title = $data[0];
+
+        return new FeedTitleParsed($title, $codec, $episodes, $quality);
     }
 }
