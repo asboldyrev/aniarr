@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Dto;
+namespace App\Services\Rss\Dto;
 
-class FeedItemParsed
+class FeedItem
 {
     public function __construct(
         readonly string $title,
@@ -15,7 +15,5 @@ class FeedItemParsed
         readonly string $codec,
         readonly array $episodes,
         readonly string $quality,
-    ) {
-        // throw new \Exception('Not implemented');
-    }
+    ) {}
 }

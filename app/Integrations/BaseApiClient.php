@@ -1,16 +1,14 @@
 <?php
 
-namespace App\Services;
+namespace App\Integrations;
 
 use App\Exceptions\FailedRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
-abstract class BaseApiService
+abstract class BaseApiClient
 {
     protected string $baseUrl;
-
-    protected array $credentials = [];
 
     /**
      * Инициализация сервиса с настройками из базы данных

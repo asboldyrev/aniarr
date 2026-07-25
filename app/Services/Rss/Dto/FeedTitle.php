@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Dto;
+namespace App\Services\Rss\Dto;
 
-class FeedTitleParsed
+class FeedTitle
 {
     public function __construct(
         public readonly string $title,

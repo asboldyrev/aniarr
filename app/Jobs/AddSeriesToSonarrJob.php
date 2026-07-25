@@ -2,9 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Integrations\SonarrClient;
 use App\Models\Series;
-use App\Services\AniarrLogger;
-use App\Services\SonarrService;
+use App\Services\Logging\AniarrLogger;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -27,7 +27,7 @@ class AddSeriesToSonarrJob implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(SonarrService $sonarrService): void
+    public function handle(SonarrClient $sonarrClient): void
     {
         /** @var Series $series */
         $series = Series::find($this->seriesId);
@@ -35,12 +35,12 @@ class AddSeriesToSonarrJob implements ShouldQueue
             return;
         }
 
-        if (!$sonarrService->testConnection() || !$series->thetvdb_id) {
+        if (!$sonarrClient->testConnection() || !$series->thetvdb_id) {
             $series->update(['sonarr_connected' => false, 'last_updated' => now()]);
             return;
         }
 
-        $seriesInSonarr = $this->addSeriesToSonarr($sonarrService, $series);
+        $seriesInSonarr = $this->addSeriesToSonarr($sonarrClient, $series);
         if ($seriesInSonarr === null) {
             $series->update(['sonarr_connected' => false, 'last_updated' => now()]);
             return;
@@ -52,16 +52,16 @@ class AddSeriesToSonarrJob implements ShouldQueue
     /**
      * Добавляет сериал в Sonarr
      */
-    private function addSeriesToSonarr(SonarrService $sonarrService, Series $series): ?array
+    private function addSeriesToSonarr(SonarrClient $sonarrClient, Series $series): ?array
     {
         $thetvdbId = $series->thetvdb_id;
-        $lookup = $sonarrService->findByTvdbId($thetvdbId);
+        $lookup = $sonarrClient->findByTvdbId($thetvdbId);
         if (!$lookup || !is_array($lookup)) {
             app(AniarrLogger::class)->warning('Сериал не найден в Sonarr');
             return null;
         }
 
-        $rootFolders = $sonarrService->getRootFolders();
+        $rootFolders = $sonarrClient->getRootFolders();
         $rootPath = null;
         foreach ($rootFolders as $folder) {
             $path = $folder['path'] ?? null;
@@ -76,7 +76,7 @@ class AddSeriesToSonarrJob implements ShouldQueue
             return null;
         }
 
-        $qualityProfiles = $sonarrService->getQualityProfiles();
+        $qualityProfiles = $sonarrClient->getQualityProfiles();
         $qualityProfileId = null;
         foreach ($qualityProfiles as $profile) {
             $id = $profile['id'] ?? null;
@@ -91,12 +91,12 @@ class AddSeriesToSonarrJob implements ShouldQueue
             return null;
         }
 
-        $added = $sonarrService->addSeriesFromLookup($lookup, $rootPath, $qualityProfileId);
+        $added = $sonarrClient->addSeriesFromLookup($lookup, $rootPath, $qualityProfileId);
         if ($added && is_array($added) && isset($added['id'])) {
             return $added;
         }
 
-        $seriesInSonarr = $sonarrService->findByTvdbId($thetvdbId);
+        $seriesInSonarr = $sonarrClient->findByTvdbId($thetvdbId);
 
         return $seriesInSonarr;
     }

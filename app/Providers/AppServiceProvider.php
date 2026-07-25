@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use App\Services\AniarrLogger;
+use App\Services\Logging\AniarrLogger;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider

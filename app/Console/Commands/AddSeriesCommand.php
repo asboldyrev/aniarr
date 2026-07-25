@@ -6,13 +6,13 @@ use App\Actions\AddSeries;
 use App\Actions\AddSeriesAction;
 use App\Actions\DownloadPoster;
 use App\Enums\Status;
+use App\Integrations\SonarrClient;
+use App\Integrations\Tvdb\TvdbClient;
 use App\Jobs\AddSeriesToSonarrJob;
 use App\Jobs\SyncSeriesWithSonarrJob;
 use App\Models\Series;
-use App\Services\AniarrLogger;
-use App\Services\RssParserService;
-use App\Services\SonarrService;
-use App\Services\TheTVDBService;
+use App\Services\Logging\AniarrLogger;
+use App\Services\Rss\RssParser;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Bus;
 
@@ -40,6 +40,6 @@ class AddSeriesCommand extends Command
         $rssUrl = $this->argument('rss_url');
         $tvdbId = $this->argument('tvdb_id');
 
-        $addSeries($tvdbId, $rssUrl);
+        $addSeries->execute($tvdbId, $rssUrl);
     }
 }

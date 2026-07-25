@@ -2,7 +2,7 @@
 
 namespace App\Actions;
 
-use App\Services\AniarrLogger;
+use App\Services\Logging\AniarrLogger;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
@@ -32,10 +32,5 @@ final class DownloadPosterAction
             app(AniarrLogger::class)->exception($e);
             return null;
         }
-    }
-
-    public function __invoke(string $url, int $seriesId): string|null
-    {
-        return self::execute($url, $seriesId);
     }
 }

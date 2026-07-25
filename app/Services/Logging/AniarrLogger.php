@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Logging;
 
 use App\Enums\LogType;
 use App\Exceptions\BadMethodCallException;

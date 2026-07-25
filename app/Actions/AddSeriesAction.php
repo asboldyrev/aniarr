@@ -3,20 +3,21 @@
 namespace App\Actions;
 
 use App\Enums\Status;
+use App\Integrations\SonarrClient;
+use App\Integrations\Tvdb\TvdbClient;
+use App\Integrations\Tvdb\TvdbLocaleMapper;
 use App\Jobs\AddSeriesToSonarrJob;
 use App\Jobs\SyncSeriesWithSonarrJob;
 use App\Models\Series;
-use App\Services\AniarrLogger;
-use App\Services\SonarrService;
-use App\Services\TheTVDBService;
+use App\Services\Logging\AniarrLogger;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Bus;
 
 final class AddSeriesAction
 {
-    public static function execute(int|string $tvdbId, string $rssUrl, Series|null $series = null): void
+    public function execute(int|string $tvdbId, string $rssUrl, Series|null $series = null): void
     {
-        $tvdbClient = new TheTVDBService();
+        $tvdbClient = new TvdbClient();
         $tvdbData = $tvdbClient->getSeries($tvdbId);
 
         $posterUrl = $tvdbClient->getPoster($tvdbId);
@@ -41,7 +42,7 @@ final class AddSeriesAction
 
         app(AniarrLogger::class)->setSeries($series->id);
 
-        $sonarrClient = new SonarrService();
+        $sonarrClient = new SonarrClient();
 
         if ($sonarrClient->hasSeries($tvdbId)) {
             SyncSeriesWithSonarrJob::dispatch($series->id);
@@ -51,11 +52,6 @@ final class AddSeriesAction
                 SyncSeriesWithSonarrJob::dispatch($series->id)
             ]);
         }
-    }
-
-    public function __invoke(int|string $tvdbId, string $rssUrl, Series|null $series = null): void
-    {
-        self::execute($tvdbId, $rssUrl);
     }
 
     private static function getTitle(array $tvdbData): string
@@ -68,8 +64,8 @@ final class AddSeriesAction
         $aliasTitle = '';
         $fallbackAliasTitle = '';
 
-        $locale = app(TheTVDBService::class)->convertLocaleToTheTVDB(config('app.locale'));
-        $fallbackLocale = app(TheTVDBService::class)->convertLocaleToTheTVDB(config('app.fallback_locale'));
+        $locale = app(TvdbLocaleMapper::class)->map(config('app.locale'));
+        $fallbackLocale = app(TvdbLocaleMapper::class)->map(config('app.fallback_locale'));
 
         foreach ($tvdbData['aliases'] as $alias) {
             if ($alias['language'] == $locale) {

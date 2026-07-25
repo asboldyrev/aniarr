@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Dto;
+namespace App\Services\Rss\Dto;
 
-class FeedParseResult
+class FeedItems
 {
     public function __construct(
         public readonly array $items,

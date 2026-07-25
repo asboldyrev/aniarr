@@ -1,18 +1,23 @@
 <?php
 
-namespace App\Services;
+namespace App\Integrations\Tvdb;
 
+use App\Integrations\BaseApiClient;
 use App\Models\Settings;
+use App\Services\Logging\AniarrLogger;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
-class TheTVDBService extends BaseApiService
+class TvdbClient extends BaseApiClient
 {
     protected string $apiKey;
     protected ?string $pin = null;
     protected ?string $token = null;
     protected string $locale = 'eng';
 
+    /**
+     * Получить данные по сериалу
+     */
     public function getSeries(int|string $id): array
     {
         $cacheKey = "thetvdb:getSeries:" . md5($id . ':' . $this->locale);
@@ -42,6 +47,9 @@ class TheTVDBService extends BaseApiService
         });
     }
 
+    /**
+     * Поиск сериала
+     */
     public function search(string $query, string $type = 'series'): array
     {
         $cacheKey = "thetvdb:search:" . md5(Str::slug($query) . ':' . $type . ':' . $this->locale);
@@ -126,7 +134,7 @@ class TheTVDBService extends BaseApiService
         $this->pin = Settings::get('thetvdb_pin', null);
 
         $appLocale = config('app.locale', 'en');
-        $this->locale = $this->convertLocaleToTheTVDB($appLocale);
+        $this->locale = app(TvdbLocaleMapper::class)->map($appLocale);
 
         $this->login();
     }
@@ -179,30 +187,6 @@ class TheTVDBService extends BaseApiService
     }
 
     /**
-     * Преобразовать локаль Laravel в формат TheTVDB
-     */
-    public function convertLocaleToTheTVDB(string $locale): string
-    {
-        $localeMap = [
-            'en' => 'eng',
-            'ru' => 'rus',
-            'ja' => 'jpn',
-            'fr' => 'fra',
-            'es' => 'spa',
-            'de' => 'deu',
-            'it' => 'ita',
-            'pt' => 'por',
-            'zh' => 'zho',
-            'ko' => 'kor',
-        ];
-
-        // Извлекаем базовый язык (например, 'ru' из 'ru_RU')
-        $baseLocale = explode('_', $locale)[0];
-
-        return $localeMap[$baseLocale] ?? 'eng';
-    }
-
-    /**
      * Получить изображения сериала
      */
     protected function getImages(int $seriesId, string|null $type = null, string|null $lang = null): array
@@ -214,7 +198,7 @@ class TheTVDBService extends BaseApiService
             try {
                 $query = ['lang' => $lang];
                 if ($type) {
-                    $query['type'] = $this->getTypes($type);
+                    $query['type'] = app(TvdbImageTypeMapper::class)->map($type);
                 }
 
                 $response = $this->get("series/{$seriesId}/artworks", $query);
@@ -229,37 +213,5 @@ class TheTVDBService extends BaseApiService
                 return [];
             }
         });
-    }
-
-    protected function getTypes(string $type): string
-    {
-        $types = [
-            1 => 'banners',
-            2 => 'posters',
-            3 => 'backgrounds',
-            5 => 'icons',
-            6 => 'banners',
-            7 => 'posters',
-            8 => 'backgrounds',
-            10 => 'icons',
-            11 => 'screencap',
-            12 => 'screencap',
-            13 => 'photo',
-            14 => 'posters',
-            15 => 'backgrounds',
-            16 => 'banners',
-            18 => 'icons',
-            19 => 'icons',
-            20 => 'cinemagraphs',
-            21 => 'cinemagraphs',
-            22 => 'clearart',
-            23 => 'clearlogo',
-            24 => 'clearart',
-            25 => 'clearlogo',
-            26 => 'icons',
-            27 => 'posters',
-        ];
-
-        return implode(',', array_keys($types, $type));
     }
 }

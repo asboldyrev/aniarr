@@ -8,7 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreSeriesRequest;
 use App\Http\Resources\SeriesResource;
 use App\Models\Series;
-use App\Services\AniarrLogger;
+use App\Services\Logging\AniarrLogger;
 use Illuminate\Http\JsonResponse;
 
 class SeriesController extends Controller
@@ -32,7 +32,7 @@ class SeriesController extends Controller
 
         app(AniarrLogger::class)->setSeries($series->id);
 
-        $addSeries($request->thetvdb_id, $request->rss_url, $series);
+        $addSeries->execute($request->thetvdb_id, $request->rss_url, $series);
 
         return response()->json(new SeriesResource($series), 201);
     }

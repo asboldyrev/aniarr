@@ -4,11 +4,11 @@ namespace App\Jobs;
 
 use App\Enums\Status;
 use App\Events\SeriesUpdated;
+use App\Integrations\SonarrClient;
 use App\Models\Episode;
 use App\Models\Series;
-use App\Services\AniarrLogger;
+use App\Services\Logging\AniarrLogger;
 use App\Services\SeriesStatsBroadcaster;
-use App\Services\SonarrService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -25,14 +25,12 @@ class SyncSeriesWithSonarrJob implements ShouldQueue
      */
     public function __construct(
         public int $seriesId
-    ) {
-        //
-    }
+    ) {}
 
     /**
      * Execute the job.
      */
-    public function handle(SonarrService $sonarrService): void
+    public function handle(SonarrClient $sonarrService): void
     {
         $series = Series::find($this->seriesId);
         if (!$series) {
@@ -55,11 +53,11 @@ class SyncSeriesWithSonarrJob implements ShouldQueue
     }
 
     /**
-     * Только синхронизировать данные из Sonarr в проект (для джобы). Сериал должен уже быть в Sonarr.
+     * Только синхронизировать данные из Sonarr в проект (для задачи). Сериал должен уже быть в Sonarr.
      */
-    public function runSyncFromSonarrOnly(SonarrService $sonarrService, Series $series): void
+    public function runSyncFromSonarrOnly(SonarrClient $sonarrService, Series $series): void
     {
-        $sonarrService = app(SonarrService::class);
+        $sonarrService = app(SonarrClient::class);
         if (!$sonarrService->testConnection() || !$series->thetvdb_id) {
             $series->update(['sonarr_connected' => false, 'last_updated' => now()]);
             return;
@@ -81,7 +79,7 @@ class SyncSeriesWithSonarrJob implements ShouldQueue
         SeriesStatsBroadcaster::broadcast();
     }
 
-    public function syncSeriesStateFromSonarr(Series $series, array $sonarrSeries, SonarrService $sonarrService): void
+    public function syncSeriesStateFromSonarr(Series $series, array $sonarrSeries, SonarrClient $sonarrService): void
     {
         $sonarrId = (int) ($sonarrSeries['id'] ?? 0);
         if ($sonarrId === 0) {

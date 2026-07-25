@@ -1,15 +1,19 @@
 <?php
 
-namespace App\Services;
+namespace App\Integrations\QBittorrent;
 
 use App\Exceptions\BaseUrlNotConfigured;
+use App\Integrations\BaseApiClient;
 use App\Models\Settings;
+use App\Support\Formatting\TransferFormatter;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
-class QBittorrentService extends BaseApiService
+class QBittorrentClient extends BaseApiClient
 {
     protected ?string $cookie = null;
+
+    protected array $credentials = [];
 
     /**
      * Авторизация в qBittorrent
@@ -170,8 +174,8 @@ class QBittorrentService extends BaseApiService
             return null;
         }
 
-        $speed = $this->formatSpeed($torrent['dlspeed'] ?? 0);
-        $eta = $this->formatEta($torrent['eta'] ?? -1);
+        $speed = TransferFormatter::speed($torrent['dlspeed'] ?? 0);
+        $eta = TransferFormatter::eta($torrent['eta'] ?? -1);
 
         return [
             'progress' => ($torrent['progress'] ?? 0) * 100,
@@ -232,38 +236,6 @@ class QBittorrentService extends BaseApiService
         }
 
         return $headers;
-    }
-
-    /**
-     * Форматирование скорости загрузки
-     */
-    protected function formatSpeed(int $bytesPerSecond): string
-    {
-        if ($bytesPerSecond >= 1048576) {
-            return round($bytesPerSecond / 1048576, 1) . ' MB/s';
-        }
-
-        if ($bytesPerSecond >= 1024) {
-            return round($bytesPerSecond / 1024, 1) . ' KB/s';
-        }
-
-        return $bytesPerSecond . ' B/s';
-    }
-
-    /**
-     * Форматирование ETA
-     */
-    protected function formatEta(int $seconds): ?string
-    {
-        if ($seconds < 0) {
-            return null;
-        }
-
-        $hours = floor($seconds / 3600);
-        $minutes = floor(($seconds % 3600) / 60);
-        $secs = $seconds % 60;
-
-        return sprintf('%02d:%02d:%02d', $hours, $minutes, $secs);
     }
 
     /**

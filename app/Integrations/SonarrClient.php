@@ -1,12 +1,10 @@
 <?php
 
-namespace App\Services;
+namespace App\Integrations;
 
 use App\Models\Settings;
-use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Log;
 
-class SonarrService extends BaseApiService
+class SonarrClient extends BaseApiClient
 {
     protected string $apiKey;
 

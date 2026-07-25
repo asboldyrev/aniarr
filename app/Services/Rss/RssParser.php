@@ -2,41 +2,39 @@
 
 namespace App\Services;
 
-use App\Dto\FeedItemParsed;
-use App\Dto\FeedParseResult;
-use App\Dto\FeedTitleParsed;
-use App\Dto\PendingAniarrLog;
-use App\Enums\LogType;
+use App\Actions\Torrents\SaveTorrent;
 use App\Models\Series;
 use App\Models\Torrent;
+use App\Services\Logging\AniarrLogger;
+use App\Services\Rss\Dto\FeedItem;
+use App\Services\Rss\Dto\FeedItems;
+use App\Services\Rss\Dto\FeedTitle;
 use Exception;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Cache;
 
-class RssParserService
+class RssParser
 {
     /**
      * Парсинг RSS-ленты и извлечение информации из торрента
      *
      * @param string $url URL RSS ленты
-     * @return FeedParseResult Распарсенные данные
+     * @return FeedItems Распарсенные данные
      */
-    public function parseFeed(string $url): FeedParseResult
+    public function parseFeed(string $url): FeedItems
     {
         try {
             $response = Http::timeout(30)->get($url);
 
             if ($response->failed()) {
                 app(AniarrLogger::class)->error('Запрос RSS-ленты завершился ошибкой: ' . $response->status());
-                return new FeedParseResult([]);
+                return new FeedItems([]);
             }
 
             $xml = simplexml_load_string($response->body(), 'SimpleXMLElement', LIBXML_NOCDATA);
 
             if ($xml === false) {
                 app(AniarrLogger::class)->error('Ошибка парсинга RSS-ленты: ' . $response->status());
-                return new FeedParseResult([]);
+                return new FeedItems([]);
             }
 
             $items = [];
@@ -47,69 +45,26 @@ class RssParserService
                 }
             }
 
-            return new FeedParseResult(items: $items);
+            return new FeedItems(items: $items);
         } catch (\Exception $e) {
             app(AniarrLogger::class)->exception($e);
-            return new FeedParseResult([]);
+            return new FeedItems([]);
         }
-    }
-
-    /**
-     * Проверяет, изменилась ли лента новостей с момента последней проверки
-     */
-    public function hasFeedChanged(Series $series, array $items): bool
-    {
-        if (empty($items)) {
-            return false;
-        }
-
-        $latestGuid = $items[0]['guid'] ?? null;
-
-        return $series->last_rss_hash !== $latestGuid;
-    }
-
-    /**
-     * Появились новые элементы с момента последней проверки
-     */
-    public function getNewItems(Series $series, array $items): array
-    {
-        if (empty($series->last_rss_hash)) {
-            return $items; // First check, return all
-        }
-
-        $newItems = [];
-        foreach ($items as $item) {
-            if ($item['guid'] === $series->last_rss_hash) {
-                break; // Reached last known item
-            }
-            $newItems[] = $item;
-        }
-
-        return $newItems;
     }
 
     /**
      * Сохраняет торрент в БД
+     * @deprecated
      */
-    public function saveTorrent(Series $series, array $item): ?Torrent
+    public function saveTorrent(Series $series, FeedItem $item): ?Torrent
     {
-        return Torrent::updateOrCreate(
-            ['guid' => $item['guid']],
-            [
-                'series_id' => $series->id,
-                'torrent_url' => $item['torrent_url'],
-                'torrent_id' => $item['torrent_id'],
-                'codec' => $item['codec'],
-                'episodes' => $item['episodes'],
-                'size' => $item['size'],
-            ]
-        );
+        return app(SaveTorrent::class)->execute($series, $item);
     }
 
     /**
      * Парсинг отдельного RSS-элемента
      */
-    protected function parseItem($item): ?FeedItemParsed
+    protected function parseItem($item): ?FeedItem
     {
         try {
             $title = (string) $item->title;
@@ -131,7 +86,7 @@ class RssParserService
                 return null;
             }
 
-            return new FeedItemParsed(
+            return new FeedItem(
                 $metadata->title,
                 $guid,
                 $torrentUrl,
@@ -151,11 +106,11 @@ class RssParserService
 
 
     /**
-     * Parse title string to extract metadata
+     * Парсит заголовок и разбивает достаёт метаданные
      *
      * Format: "Название | WEBRip 1080p | HEVC | 1-12"
      */
-    protected function parseTitle(string $title): ?FeedTitleParsed
+    protected function parseTitle(string $title): ?FeedTitle
     {
         // Remove CDATA wrapper if present
         $title = trim($title);
@@ -168,7 +123,7 @@ class RssParserService
         $codec = trim($data[2]);
 
         if (!$codec) {
-            return null; // Not a valid anime release
+            return null;
         }
 
         $range = explode('-', $data[3]);
@@ -190,6 +145,6 @@ class RssParserService
 
         $title = $data[0];
 
-        return new FeedTitleParsed($title, $codec, $episodes, $quality);
+        return new FeedTitle($title, $codec, $episodes, $quality);
     }
 }

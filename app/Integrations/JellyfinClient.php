@@ -1,12 +1,13 @@
 <?php
 
-namespace App\Services;
+namespace App\Integrations;
 
 use App\Models\Settings;
+use App\Services\Logging\AniarrLogger;
+use Exception;
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Log;
 
-class JellyfinService extends BaseApiService
+class JellyfinService extends BaseApiClient
 {
     protected string $apiKey;
 
@@ -42,7 +43,7 @@ class JellyfinService extends BaseApiService
         try {
             $response = $this->getSystemInfo();
             return $response->successful();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             app(AniarrLogger::class)->exception($e);
             return false;
         }
