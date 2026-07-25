@@ -4,9 +4,30 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property int $series_id
+ * @property string $guid
+ * @property string $torrent_url
+ * @property string|null $torrent_id
+ * @property string $codec
+ * @property array $episodes
+ * @property int $size
+ * @property bool $downloaded
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
+ * @property-read Series $series
+ * @property-read string $episode_range
+ */
 class Torrent extends Model
 {
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
         'series_id',
         'guid',
@@ -18,10 +39,23 @@ class Torrent extends Model
         'downloaded',
     ];
 
-    protected $casts = [
-        'episodes' => 'array',
-    ];
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'episodes' => 'array',
+            'size' => 'integer',
+            'downloaded' => 'boolean',
+        ];
+    }
 
+    /**
+     * Get the series that owns the torrent.
+     */
     public function series(): BelongsTo
     {
         return $this->belongsTo(Series::class);
@@ -52,6 +86,6 @@ class Torrent extends Model
      */
     public function hasEpisodes(array $episodeNumbers): bool
     {
-        return !empty(array_intersect($this->episodes, $episodeNumbers));
+        return ! empty(array_intersect($this->episodes, $episodeNumbers));
     }
 }

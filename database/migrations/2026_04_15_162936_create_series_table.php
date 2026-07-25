@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('series', function (Blueprint $table) {
             $table->id();
+            $table->integer('sonarr_id')->nullable();
             $table->string('title');
             $table->unsignedBigInteger('thetvdb_id')->index();
             $table->string('thetvdb_slug');
@@ -39,6 +40,12 @@ return new class extends Migration
             $table->string('last_episodes')->nullable();
             $table->text('error_message')->nullable();
             $table->boolean('sonarr_connected')->default(false);
+
+            $table->timestamp('last_rss_check')->nullable();
+            $table->string('last_rss_hash')->nullable(); // последний известный guid
+            $table->boolean('has_hevc')->default(false);
+            $table->boolean('has_avc')->default(false);
+            $table->boolean('upgrade_to_hevc')->default(false); // флаг для перекачивания
 
             $table->timestamps();
         });

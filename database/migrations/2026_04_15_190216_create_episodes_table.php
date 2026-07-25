@@ -13,7 +13,10 @@ return new class extends Migration
     {
         Schema::create('episodes', function (Blueprint $table) {
             $table->id();
+            $table->integer('sonarr_id')->nullable();
             $table->string('title');
+            $table->boolean('has_avc')->default(false);
+            $table->boolean('has_hevc')->default(false);
             $table->foreignId('series_id')->constrained('series');
             $table->unsignedSmallInteger('season_number');
             $table->unsignedSmallInteger('episode_number');
