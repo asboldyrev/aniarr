@@ -7,12 +7,15 @@ use App\Services\Logging\AniarrLogger;
 use Exception;
 use Illuminate\Http\Client\Response;
 
-class JellyfinService extends BaseApiClient
+/**
+ * Клиент API Jellyfin для управления библиотекой и системных операций.
+ */
+class JellyfinCLient extends BaseApiClient
 {
     protected string $apiKey;
 
     /**
-     * Загрузить настройки Jellyfin из базы данных
+     * Загрузить настройки Jellyfin из базы данных.
      */
     protected function loadSettings(): void
     {
@@ -21,50 +24,59 @@ class JellyfinService extends BaseApiClient
     }
 
     /**
-     * Получить заголовки для запросов
+     * Получить заголовки для запросов.
+     *
+     * @return array<string, string>
      */
     protected function getHeaders(): array
     {
         return [
-            'X-Emby-Authorization' => 'MediaBrowser Client="AniArr", Device="Server", DeviceId="AniArr", Version="1.0.0", Token="' . $this->apiKey . '"',
+            'X-Emby-Authorization' => 'MediaBrowser Client="AniArr", Device="Server", DeviceId="AniArr", Version="1.0.0", Token="'.$this->apiKey.'"',
             'Content-Type' => 'application/json',
         ];
     }
 
     /**
-     * Проверить подключение к Jellyfin
+     * Проверить подключение к Jellyfin.
+     *
+     * @return bool true, если подключение успешно, иначе false
      */
     public function testConnection(): bool
     {
-        if (!$this->isConfigured()) {
+        if (! $this->isConfigured()) {
             return false;
         }
 
         try {
             $response = $this->getSystemInfo();
+
             return $response->successful();
         } catch (Exception $e) {
             app(AniarrLogger::class)->exception($e);
+
             return false;
         }
     }
 
     /**
-     * Обновить библиотеку
+     * Обновить библиотеку.
+     *
+     * @param  string|null  $libraryId  Опциональный идентификатор библиотеки
+     * @return bool true, если запрос на обновление выполнен успешно
      */
     public function refreshLibrary(?string $libraryId = null): bool
     {
         if ($libraryId) {
-            $response = $this->post("Library/Series/Updated", ['Id' => $libraryId]);
+            $response = $this->post('Library/Series/Updated', ['Id' => $libraryId]);
         } else {
-            $response = $this->post("Library/Refresh");
+            $response = $this->post('Library/Refresh');
         }
 
         return $response->successful();
     }
 
     /**
-     * Получить информацию о системе
+     * Получить информацию о системе.
      */
     public function getSystemInfo(): Response
     {
@@ -72,11 +84,12 @@ class JellyfinService extends BaseApiClient
     }
 
     /**
-     * Получить список библиотек
+     * Получить список библиотек.
      */
     public function getLibraries(): array
     {
         $response = $this->get('Library/VirtualFolders');
+
         return $response->successful() ? $response->json() : [];
     }
 }

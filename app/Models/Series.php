@@ -47,7 +47,7 @@ class Series extends Model
     use HasFactory;
 
     /**
-     * The attributes that are mass assignable.
+     * Атрибуты, которые можно массово назначать.
      *
      * @var array<int, string>
      */
@@ -78,7 +78,7 @@ class Series extends Model
     ];
 
     /**
-     * Get the attributes that should be cast.
+     * Получает атрибуты, которые должны быть приведены.
      *
      * @return array<string, string>
      */
@@ -101,7 +101,7 @@ class Series extends Model
     }
 
     /**
-     * Get the episodes for the series.
+     * Получает эпизоды для сериала.
      */
     public function episodes(): HasMany
     {
@@ -109,7 +109,7 @@ class Series extends Model
     }
 
     /**
-     * Get the activity logs for the series.
+     * Получает логи активности для сериала.
      */
     public function activityLogs(): HasMany
     {
@@ -117,7 +117,7 @@ class Series extends Model
     }
 
     /**
-     * Get the torrents for the series.
+     * Получает торренты для сериала.
      */
     public function torrents(): HasMany
     {
@@ -125,7 +125,7 @@ class Series extends Model
     }
 
     /**
-     * Get the HEVC torrents for the series.
+     * Получает HEVC торренты для сериала.
      */
     public function hevcTorrents(): HasMany
     {
@@ -133,10 +133,18 @@ class Series extends Model
     }
 
     /**
-     * Get the AVC torrents for the series.
+     * Получает AVC торренты для сериала.
      */
     public function avcTorrents(): HasMany
     {
         return $this->hasMany(Torrent::class)->where('codec', 'AVC');
+    }
+
+    /**
+     * Генерирует тег для qBittorrent на основе ID сериала.
+     */
+    public function qbitTag(): string
+    {
+        return 'aniarr-'.$this->id;
     }
 }

@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Integrations\SonarrClient;
+use App\Integrations\Sonarr\SonarrClient;
 use App\Models\Series;
 use App\Services\Logging\AniarrLogger;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -11,6 +11,9 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
+/**
+ * Задача для добавления сериала в Sonarr.
+ */
 class AddSeriesToSonarrJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
@@ -20,9 +23,7 @@ class AddSeriesToSonarrJob implements ShouldQueue
      */
     public function __construct(
         public int $seriesId
-    ) {
-        //
-    }
+    ) {}
 
     /**
      * Execute the job.
@@ -31,18 +32,20 @@ class AddSeriesToSonarrJob implements ShouldQueue
     {
         /** @var Series $series */
         $series = Series::find($this->seriesId);
-        if (!$series || !$series->thetvdb_id) {
+        if (! $series || ! $series->thetvdb_id) {
             return;
         }
 
-        if (!$sonarrClient->testConnection() || !$series->thetvdb_id) {
+        if (! $sonarrClient->testConnection() || ! $series->thetvdb_id) {
             $series->update(['sonarr_connected' => false, 'last_updated' => now()]);
+
             return;
         }
 
         $seriesInSonarr = $this->addSeriesToSonarr($sonarrClient, $series);
         if ($seriesInSonarr === null) {
             $series->update(['sonarr_connected' => false, 'last_updated' => now()]);
+
             return;
         }
 
@@ -50,14 +53,19 @@ class AddSeriesToSonarrJob implements ShouldQueue
     }
 
     /**
-     * Добавляет сериал в Sonarr
+     * Добавляет сериал в Sonarr.
+     *
+     * @param  SonarrClient  $sonarrClient  Экземпляр клиента Sonarr
+     * @param  Series  $series  Модель сериала
+     * @return array|null Данные добавленного сериала или null при ошибке
      */
     private function addSeriesToSonarr(SonarrClient $sonarrClient, Series $series): ?array
     {
         $thetvdbId = $series->thetvdb_id;
         $lookup = $sonarrClient->findByTvdbId($thetvdbId);
-        if (!$lookup || !is_array($lookup)) {
+        if (! $lookup || ! is_array($lookup)) {
             app(AniarrLogger::class)->warning('Сериал не найден в Sonarr');
+
             return null;
         }
 
@@ -73,6 +81,7 @@ class AddSeriesToSonarrJob implements ShouldQueue
 
         if ($rootPath === null) {
             app(AniarrLogger::class)->warning('Не найдены корневые директории в Sonarr');
+
             return null;
         }
 
@@ -88,6 +97,7 @@ class AddSeriesToSonarrJob implements ShouldQueue
 
         if ($qualityProfileId === null) {
             app(AniarrLogger::class)->warning('Не найдены профили качества в Sonarr');
+
             return null;
         }
 

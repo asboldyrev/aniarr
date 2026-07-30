@@ -9,6 +9,9 @@ use App\Support\Formatting\TransferFormatter;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
+/**
+ * Клиент API QBittorrent для управления торрентами.
+ */
 class QBittorrentClient extends BaseApiClient
 {
     protected ?string $cookie = null;
@@ -16,11 +19,13 @@ class QBittorrentClient extends BaseApiClient
     protected array $credentials = [];
 
     /**
-     * Авторизация в qBittorrent
+     * Авторизация в qBittorrent.
+     *
+     * @return bool true, если аутентификация прошла успешно
      */
     public function login(): bool
     {
-        $response = Http::asForm()->post(rtrim($this->baseUrl, '/') . '/api/v2/auth/login', [
+        $response = Http::asForm()->post(rtrim($this->baseUrl, '/').'/api/v2/auth/login', [
             'username' => $this->credentials['username'],
             'password' => $this->credentials['password'],
         ]);
@@ -30,7 +35,8 @@ class QBittorrentClient extends BaseApiClient
             if ($cookies) {
                 // Извлекаем SID из кук
                 if (preg_match('/SID=([^;]+)/', $cookies, $matches)) {
-                    $this->cookie = "SID=" . $matches[1];
+                    $this->cookie = 'SID='.$matches[1];
+
                     return true;
                 }
             }
@@ -40,11 +46,13 @@ class QBittorrentClient extends BaseApiClient
     }
 
     /**
-     * Проверить подключение к сервису
+     * Проверить подключение к сервису.
+     *
+     * @return bool true, если подключение успешно
      */
     public function testConnection(): bool
     {
-        if (!$this->isConfigured()) {
+        if (! $this->isConfigured()) {
             return false;
         }
 
@@ -52,11 +60,15 @@ class QBittorrentClient extends BaseApiClient
     }
 
     /**
-     * Добавление торрента через URL
+     * Добавление торрента через URL.
+     *
+     * @param  string  $url  URL торрента или магнет-ссылка
+     * @param  array  $options  Дополнительные опции qBittorrent (savepath, category и т.д.)
+     * @return bool true, если торрент добавлен успешно
      */
     public function addTorrentUrl(string $url, array $options = []): bool
     {
-        if (!$this->cookie && !$this->login()) {
+        if (! $this->cookie && ! $this->login()) {
             return false;
         }
 
@@ -64,69 +76,78 @@ class QBittorrentClient extends BaseApiClient
 
         $response = Http::withHeaders($this->getHeaders())
             ->asForm()
-            ->post(rtrim($this->baseUrl, '/') . '/api/v2/torrents/add', $params);
+            ->post(rtrim($this->baseUrl, '/').'/api/v2/torrents/add', $params);
 
         return $response->successful();
     }
 
     /**
-     * Старт загрузки торрента
+     * Старт загрузки торрента.
+     *
+     * @param  string  $hash  Хэш торрента
+     * @return bool true, если команда возобновления выполнена успешно
      */
     public function startTorrent(string $hash): bool
     {
-        if (!$this->cookie && !$this->login()) {
+        if (! $this->cookie && ! $this->login()) {
             return false;
         }
 
-        $response = $this->post('api/v2/torrents/resume', ['hashes' => $hash]);
+        $response = $this->post('/api/v2/torrents/resume', ['hashes' => $hash]);
+
         return $response->successful();
     }
 
     /**
-     * Стоп загрузки торрента
+     * Стоп загрузки торрента.
+     *
+     * @param  string  $hash  Хэш торрента
+     * @return bool true, если команда паузы выполнена успешно
      */
     public function stopTorrent(string $hash): bool
     {
-        if (!$this->cookie && !$this->login()) {
+        if (! $this->cookie && ! $this->login()) {
             return false;
         }
 
-        $response = $this->post('api/v2/torrents/pause', ['hashes' => $hash]);
+        $response = $this->post('/api/v2/torrents/pause', ['hashes' => $hash]);
+
         return $response->successful();
     }
 
     /**
-     * Выставление приоритетов файлов
+     * Выставление приоритетов файлов.
      *
-     * @param string $hash Хэш торрента
-     * @param string $index индекс файлов (через |)
-     * @param int $priority Приоритет (0 = do not download, 1 = normal, 6 = high, 7 = maximal)
+     * @param  string  $hash  Хэш торрента
+     * @param  string  $index  индекс файлов (через |)
+     * @param  int  $priority  Приоритет (0 = do not download, 1 = normal, 6 = high, 7 = maximal)
+     * @return bool True if priority set successfully
      */
     public function setFilePriority(string $hash, string $index, int $priority): bool
     {
-        if (!$this->cookie && !$this->login()) {
+        if (! $this->cookie && ! $this->login()) {
             return false;
         }
 
-        $response = $this->get('api/v2/torrents/filePrio', [
-            'hashes' => $hash,
-            'index' => $index,
-            'priority' => $priority
+        $response = $this->post('/api/v2/torrents/filePrio', [
+            'hash' => $hash,
+            'id' => $index,
+            'priority' => $priority,
         ]);
 
         return $response->successful();
     }
 
     /**
-     * Устанавливает приоритеты сразу нескольким файлам
+     * Устанавливает приоритеты сразу нескольким файлам.
      *
-     * @param string $hash Torrent hash
-     * @param array $priorities Array of [fileIndex => priority]
-     * @return bool
+     * @param  string  $hash  Хэш торрента
+     * @param  array  $priorities  Массив [индекс_файла => приоритет]
+     * @return bool true, если все приоритеты установлены успешно
      */
     public function setFilePriorities(string $hash, array $priorities): bool
     {
-        if (!$this->cookie && !$this->login()) {
+        if (! $this->cookie && ! $this->login()) {
             return false;
         }
 
@@ -139,24 +160,30 @@ class QBittorrentClient extends BaseApiClient
     }
 
     /**
-     * Удаление торрента вместе с файлами
+     * Удаление торрента вместе с файлами.
+     *
+     * @param  string  $hash  Хэш торрента
+     * @return bool true, если удаление выполнено успешно
      */
     public function deleteTorrent(string $hash): bool
     {
-        if (!$this->cookie && !$this->login()) {
+        if (! $this->cookie && ! $this->login()) {
             return false;
         }
 
-        $response = $this->get('api/v2/torrents/delete', [
+        $response = $this->get('/api/v2/torrents/delete', [
             'hashes' => $hash,
-            'deleteFiles' => 'true'
+            'deleteFiles' => 'true',
         ]);
 
         return $response->successful();
     }
 
     /**
-     * Получает статистику по прогрессу торрента
+     * Получает статистику по прогрессу торрента.
+     *
+     * @param  string  $hash  Хэш торрента
+     * @return array|null Массив с прогрессом, скоростью, ETA, состоянием и файлами; null, если торрент не найден
      */
     public function getTorrentProgress(string $hash): ?array
     {
@@ -170,7 +197,7 @@ class QBittorrentClient extends BaseApiClient
 
         $torrent = $response[0] ?? null;
 
-        if (!$torrent) {
+        if (! $torrent) {
             return null;
         }
 
@@ -187,15 +214,18 @@ class QBittorrentClient extends BaseApiClient
     }
 
     /**
-     * Получает список файлов торрента
+     * Получает список файлов торрента.
+     *
+     * @param  string  $hash  Хэш торрента
+     * @return array Список файлов с индексом, именем, размером, прогрессом, приоритетом
      */
     public function getTorrentFiles(string $hash): array
     {
         $response = $this->get('/api/v2/torrents/files', [
             'hash' => $hash,
-        ]);
+        ])->json();
 
-        if (!is_array($response)) {
+        if (! is_array($response)) {
             return [];
         }
 
@@ -211,7 +241,35 @@ class QBittorrentClient extends BaseApiClient
     }
 
     /**
-     * Загрузить настройки из базы данных
+     * Получить список всех торрентов с тегом.
+     *
+     * @param  string  $tag  Тег для фильтрации
+     * @return array Список торрентов
+     */
+    public function getTorrentsByTag(string $tag): array
+    {
+        $response = $this->get('/api/v2/torrents/info', ['tag' => $tag]);
+
+        return $response->successful() ? $response->json() : [];
+    }
+
+    /**
+     * Удалить тег у всех торрентов.
+     *
+     * @param  string  $tag  Тег для удаления
+     * @return bool true, если удаление выполнено успешно
+     */
+    public function deleteTags(string $tag): bool
+    {
+        $response = $this->post('torrents/deleteTags', [
+            'form' => ['tags' => $tag],
+        ]);
+
+        return $response->successful();
+    }
+
+    /**
+     * Загрузить настройки из базы данных.
      */
     protected function loadSettings(): void
     {
@@ -223,7 +281,9 @@ class QBittorrentClient extends BaseApiClient
     }
 
     /**
-     * Получить заголовки для запросов
+     * Получить заголовки для запросов.
+     *
+     * @return array<string, string>
      */
     protected function getHeaders(): array
     {
@@ -239,7 +299,13 @@ class QBittorrentClient extends BaseApiClient
     }
 
     /**
-     * Переопределяем request для поддержки авторизации через куки
+     * Переопределяем request для поддержки авторизации через куки.
+     *
+     * @param  string  $method  HTTP-метод (get, post и т.д.)
+     * @param  string  $endpoint  Конечная точка API
+     * @param  array  $options  Опции запроса (timeout, query, json)
+     *
+     * @throws BaseUrlNotConfigured
      */
     protected function request(string $method, string $endpoint, array $options = []): Response
     {
@@ -247,7 +313,7 @@ class QBittorrentClient extends BaseApiClient
             throw new BaseUrlNotConfigured('Base URL для QBittorrent не настроен');
         }
 
-        $url = rtrim($this->baseUrl, '/') . '/' . ltrim($endpoint, '/');
+        $url = rtrim($this->baseUrl, '/').'/'.ltrim($endpoint, '/');
 
         $timeout = $options['timeout'] ?? 10;
         unset($options['timeout']);

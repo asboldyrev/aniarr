@@ -3,7 +3,7 @@
 namespace App\Actions;
 
 use App\Enums\Status;
-use App\Integrations\SonarrClient;
+use App\Integrations\Sonarr\SonarrClient;
 use App\Integrations\Tvdb\TvdbClient;
 use App\Integrations\Tvdb\TvdbLocaleMapper;
 use App\Jobs\AddSeriesToSonarrJob;
@@ -13,16 +13,28 @@ use App\Services\Logging\AniarrLogger;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Bus;
 
+/**
+ * Действие для добавления нового сериала в систему.
+ *
+ * Получает данные сериала из TVDB, загружает постер и запускает интеграцию с Sonarr.
+ */
 final class AddSeriesAction
 {
-    public function execute(int|string $tvdbId, string $rssUrl, Series|null $series = null): void
+    /**
+     * Выполняет процесс добавления сериала.
+     *
+     * @param  int|string  $tvdbId  Идентификатор сериала в TVDB
+     * @param  string  $rssUrl  URL RSS-ленты для мониторинга торрентов
+     * @param  Series|null  $series  Существующая модель сериала (опционально)
+     */
+    public function execute(int|string $tvdbId, string $rssUrl, ?Series $series = null): void
     {
-        $tvdbClient = new TvdbClient();
+        $tvdbClient = new TvdbClient;
         $tvdbData = $tvdbClient->getSeries($tvdbId);
 
         $posterUrl = $tvdbClient->getPoster($tvdbId);
 
-        if (!$series) {
+        if (! $series) {
             $series = Series::query()->firstOrCreate([
                 'thetvdb_id' => $tvdbId,
             ], [
@@ -35,25 +47,37 @@ final class AddSeriesAction
             ]);
         }
 
-        if (!$series->poster_path) {
+        if (! $series->poster_path) {
             $posterPath = DownloadPosterAction::execute($posterUrl, $series->id);
             $series->update(['poster_path' => $posterPath]);
         }
 
         app(AniarrLogger::class)->setSeries($series->id);
 
-        $sonarrClient = new SonarrClient();
+        $sonarrClient = new SonarrClient;
 
         if ($sonarrClient->hasSeries($tvdbId)) {
             SyncSeriesWithSonarrJob::dispatch($series->id);
         } else {
             Bus::chain([
                 AddSeriesToSonarrJob::dispatch($series->id),
-                SyncSeriesWithSonarrJob::dispatch($series->id)
+                SyncSeriesWithSonarrJob::dispatch($series->id),
             ]);
         }
     }
 
+    /**
+     * Определяет наилучшее название для сериала на основе данных TVDB.
+     *
+     * Приоритет:
+     * 1. Переведённое имя из `translation.name`
+     * 2. Псевдоним, соответствующий текущей локали
+     * 3. Псевдоним, соответствующий резервной локали
+     * 4. Оригинальное название сериала
+     *
+     * @param  array  $tvdbData  Массив данных сериала из TVDB
+     * @return string Выбранное название
+     */
     private static function getTitle(array $tvdbData): string
     {
         $title = Arr::get($tvdbData, 'translation.name');

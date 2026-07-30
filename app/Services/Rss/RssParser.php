@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Rss;
 
 use App\Actions\Torrents\SaveTorrent;
 use App\Models\Series;
@@ -12,12 +12,15 @@ use App\Services\Rss\Dto\FeedTitle;
 use Exception;
 use Illuminate\Support\Facades\Http;
 
+/**
+ * Сервис парсинга RSS-лент торрент-трекеров, извлечения метаданных и сохранения торрентов.
+ */
 class RssParser
 {
     /**
      * Парсинг RSS-ленты и извлечение информации из торрента
      *
-     * @param string $url URL RSS ленты
+     * @param  string  $url  URL RSS ленты
      * @return FeedItems Распарсенные данные
      */
     public function parseFeed(string $url): FeedItems
@@ -26,14 +29,16 @@ class RssParser
             $response = Http::timeout(30)->get($url);
 
             if ($response->failed()) {
-                app(AniarrLogger::class)->error('Запрос RSS-ленты завершился ошибкой: ' . $response->status());
+                app(AniarrLogger::class)->error('Запрос RSS-ленты завершился ошибкой: '.$response->status());
+
                 return new FeedItems([]);
             }
 
             $xml = simplexml_load_string($response->body(), 'SimpleXMLElement', LIBXML_NOCDATA);
 
             if ($xml === false) {
-                app(AniarrLogger::class)->error('Ошибка парсинга RSS-ленты: ' . $response->status());
+                app(AniarrLogger::class)->error('Ошибка парсинга RSS-ленты: '.$response->status());
+
                 return new FeedItems([]);
             }
 
@@ -46,14 +51,16 @@ class RssParser
             }
 
             return new FeedItems(items: $items);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             app(AniarrLogger::class)->exception($e);
+
             return new FeedItems([]);
         }
     }
 
     /**
      * Сохраняет торрент в БД
+     *
      * @deprecated
      */
     public function saveTorrent(Series $series, FeedItem $item): ?Torrent
@@ -82,7 +89,7 @@ class RssParser
             // Format: "Название | WEBRip 1080p | HEVC | 1-12"
             $metadata = $this->parseTitle($title);
 
-            if (!$metadata) {
+            if (! $metadata) {
                 return null;
             }
 
@@ -100,15 +107,15 @@ class RssParser
             );
         } catch (Exception $e) {
             app(AniarrLogger::class)->exception($e);
+
             return null;
         }
     }
 
-
     /**
      * Парсит заголовок и разбивает достаёт метаданные
      *
-     * Format: "Название | WEBRip 1080p | HEVC | 1-12"
+     * Формат: "Название | WEBRip 1080p | HEVC | 1-12"
      */
     protected function parseTitle(string $title): ?FeedTitle
     {
@@ -122,7 +129,7 @@ class RssParser
 
         $codec = trim($data[2]);
 
-        if (!$codec) {
+        if (! $codec) {
             return null;
         }
 
