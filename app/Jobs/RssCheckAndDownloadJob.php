@@ -47,7 +47,7 @@ class RssCheckAndDownloadJob implements ShouldQueue
         if ($savePath === '') {
             $folders = $sonarrClient->getRootFolders();
             $first = $folders[0]['path'] ?? null;
-            $savePath = $first ? rtrim($first, '/').'/Downloads' : '';
+            $savePath = $first ? rtrim($first, '/') . '/Downloads' : '';
         }
 
         if ($savePath === '') {
@@ -84,18 +84,29 @@ class RssCheckAndDownloadJob implements ShouldQueue
                 $isHevc = strtolower($picked->codec) == 'hevc';
                 $tag = $series->qbitTag();
 
+                $logger->info('Добавление торрента', ['url' => $picked->torrentUrl, 'tag' => $tag]);
+
                 $qBittorrentClient->addTorrentUrl($picked->torrentUrl, [
                     'stopped' => 'true', // Важное уточнение: в новой версии API параметр `paused` был заменён на `stopped`. https://github.com/qbittorrent/qBittorrent/issues/22766
                     'tags' => $tag,
                 ]);
 
+                sleep(2);
+
                 $torrents = $qBittorrentClient->getTorrentsByTag($tag);
+                $logger->info('Результат getTorrentsByTag', ['tag' => $tag, 'count' => count($torrents), 'hashes' => array_column($torrents, 'hash')]);
                 $firstTorrent = $torrents[0] ?? null;
 
-                $hash = $firstTorrent['hash'];
+                if ($firstTorrent === null) {
+                    $logger->error('Ошибка добавления торрента. Не найден торрент');
+
+                    continue;
+                }
+
+                $hash = $firstTorrent['hash'] ?? '';
 
                 if (empty($hash)) {
-                    $logger->error('Ошибка добавления торрента');
+                    $logger->error('Ошибка добавления торрента. Отсутствует хеш торрента');
 
                     continue;
                 }
@@ -117,13 +128,13 @@ class RssCheckAndDownloadJob implements ShouldQueue
                             function (array $f) {
                                 return (int) ($f['index'] ?? $f['id'] ?? -1);
                             },
-                            array_filter($files, fn (array $f) => isset($f['index']))
+                            array_filter($files, fn(array $f) => isset($f['index']))
                         )
                     )
                 );
 
                 $allIndexes = array_values(
-                    array_filter($allIndexes, fn (int $i) => $i >= 0)
+                    array_filter($allIndexes, fn(int $i) => $i >= 0)
                 );
 
                 if (empty($indexesToDownload) && ! empty($allIndexes)) {
@@ -182,7 +193,7 @@ class RssCheckAndDownloadJob implements ShouldQueue
             sleep(1);
             $files = $qbit->getTorrentFiles($hash);
 
-            $withIndex = array_filter($files, fn (array $f) => isset($f['index']));
+            $withIndex = array_filter($files, fn(array $f) => isset($f['index']));
             if (! empty($withIndex)) {
                 return $files;
             }

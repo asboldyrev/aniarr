@@ -14,7 +14,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Bus;
 
 /**
  * Работает в очереди "downloads": раз в секунду опрашивает qBittorrent,
@@ -84,7 +83,10 @@ class WatchTorrentProgressJob implements ShouldBeUnique, ShouldQueue
         $isDone = $progress >= 100 || in_array($state, ['completed', 'stalledUP', 'stoppedUp'], true);
 
         if (! $isDone) {
-            $this->release(1);
+            // Динамический интервал на основе ETA торрента для предотвращения переполнения attempts (unsignedTinyInteger)
+            // Формула: интервал от 1 до 15 секунд, пропорционально ETA (максимум 7200 секунд = 2 часа)
+            $releaseDelay = (int) max(1, min(15, ceil($eta / 7200)));
+            $this->release($releaseDelay);
 
             return;
         }
@@ -100,7 +102,7 @@ class WatchTorrentProgressJob implements ShouldBeUnique, ShouldQueue
             $savePath = rtrim($current['save_path'] ?? '', '/');
             $name = $current['name'] ?? '';
             if ($savePath !== '' && $name !== '') {
-                $contentPath = $savePath.'/'.$name;
+                $contentPath = $savePath . '/' . $name;
             }
         }
 
@@ -111,7 +113,7 @@ class WatchTorrentProgressJob implements ShouldBeUnique, ShouldQueue
                     return $file['priority'] !== 0;
                 })
                 ->map(function (array $file) use ($current) {
-                    $file['path'] = $current['save_path'].'/'.$file['name'];
+                    $file['path'] = $current['save_path'] . '/' . $file['name'];
 
                     return $file;
                 })->values()->toArray();
@@ -127,10 +129,8 @@ class WatchTorrentProgressJob implements ShouldBeUnique, ShouldQueue
                 $series->update(['active_download_path' => $contentPath, 'last_updated' => now()]);
             }
 
-            Bus::chain([
-                new ImportDownloadToSonarrJob($series->id, $files),
-                new DeleteTorrentFromQBitJob($series->id),
-            ])->onQueue('downloads')->dispatch();
+            // Запускаем только импорт в Sonarr. Удаление торрента будет выполнено после успешного импорта
+            ImportDownloadToSonarrJob::dispatch($series->id, $files)->onQueue('downloads');
         }
     }
 
@@ -139,7 +139,7 @@ class WatchTorrentProgressJob implements ShouldBeUnique, ShouldQueue
      */
     public function uniqueId(): string
     {
-        return 'watch-torrent:'.$this->seriesId;
+        return 'watch-torrent:' . $this->seriesId;
     }
 
     /**

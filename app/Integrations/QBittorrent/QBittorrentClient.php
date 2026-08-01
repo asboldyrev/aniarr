@@ -25,7 +25,7 @@ class QBittorrentClient extends BaseApiClient
      */
     public function login(): bool
     {
-        $response = Http::asForm()->post(rtrim($this->baseUrl, '/').'/api/v2/auth/login', [
+        $response = Http::asForm()->post(rtrim($this->baseUrl, '/') . '/api/v2/auth/login', [
             'username' => $this->credentials['username'],
             'password' => $this->credentials['password'],
         ]);
@@ -35,7 +35,7 @@ class QBittorrentClient extends BaseApiClient
             if ($cookies) {
                 // Извлекаем SID из кук
                 if (preg_match('/SID=([^;]+)/', $cookies, $matches)) {
-                    $this->cookie = 'SID='.$matches[1];
+                    $this->cookie = 'SID=' . $matches[1];
 
                     return true;
                 }
@@ -76,7 +76,7 @@ class QBittorrentClient extends BaseApiClient
 
         $response = Http::withHeaders($this->getHeaders())
             ->asForm()
-            ->post(rtrim($this->baseUrl, '/').'/api/v2/torrents/add', $params);
+            ->post(rtrim($this->baseUrl, '/') . '/api/v2/torrents/add', $params);
 
         return $response->successful();
     }
@@ -85,7 +85,7 @@ class QBittorrentClient extends BaseApiClient
      * Старт загрузки торрента.
      *
      * @param  string  $hash  Хэш торрента
-     * @return bool true, если команда возобновления выполнена успешно
+     * @return bool true, если команда запуска выполнена успешно
      */
     public function startTorrent(string $hash): bool
     {
@@ -93,7 +93,9 @@ class QBittorrentClient extends BaseApiClient
             return false;
         }
 
-        $response = $this->post('/api/v2/torrents/resume', ['hashes' => $hash]);
+        // В qBittorrent >= 5.0 эндпоинт /resume заменён на /start
+        // https://github.com/qbittorrent/qBittorrent/issues/22766
+        $response = $this->post('/api/v2/torrents/start', ['hashes' => $hash]);
 
         return $response->successful();
     }
@@ -102,7 +104,7 @@ class QBittorrentClient extends BaseApiClient
      * Стоп загрузки торрента.
      *
      * @param  string  $hash  Хэш торрента
-     * @return bool true, если команда паузы выполнена успешно
+     * @return bool true, если команда остановки выполнена успешно
      */
     public function stopTorrent(string $hash): bool
     {
@@ -110,7 +112,9 @@ class QBittorrentClient extends BaseApiClient
             return false;
         }
 
-        $response = $this->post('/api/v2/torrents/pause', ['hashes' => $hash]);
+        // В qBittorrent >= 5.0 эндпоинт /pause заменён на /stop
+        // https://github.com/qbittorrent/qBittorrent/issues/22766
+        $response = $this->post('/api/v2/torrents/stop', ['hashes' => $hash]);
 
         return $response->successful();
     }
@@ -171,7 +175,7 @@ class QBittorrentClient extends BaseApiClient
             return false;
         }
 
-        $response = $this->get('/api/v2/torrents/delete', [
+        $response = $this->post('/api/v2/torrents/delete', [
             'hashes' => $hash,
             'deleteFiles' => 'true',
         ]);
@@ -261,7 +265,7 @@ class QBittorrentClient extends BaseApiClient
      */
     public function deleteTags(string $tag): bool
     {
-        $response = $this->post('torrents/deleteTags', [
+        $response = $this->post('/api/v2/torrents/deleteTags', [
             'form' => ['tags' => $tag],
         ]);
 
@@ -313,7 +317,7 @@ class QBittorrentClient extends BaseApiClient
             throw new BaseUrlNotConfigured('Base URL для QBittorrent не настроен');
         }
 
-        $url = rtrim($this->baseUrl, '/').'/'.ltrim($endpoint, '/');
+        $url = rtrim($this->baseUrl, '/') . '/' . ltrim($endpoint, '/');
 
         $timeout = $options['timeout'] ?? 10;
         unset($options['timeout']);

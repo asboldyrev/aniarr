@@ -10,7 +10,7 @@ use Illuminate\Http\Client\Response;
 /**
  * Клиент API Jellyfin для управления библиотекой и системных операций.
  */
-class JellyfinCLient extends BaseApiClient
+class JellyfinClient extends BaseApiClient
 {
     protected string $apiKey;
 

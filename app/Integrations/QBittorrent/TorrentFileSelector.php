@@ -20,9 +20,10 @@ final class TorrentFileSelector
     public function selectIndexes(Series $series, array $torrentFiles): array
     {
         $existingEpisodes = $series->episodes()->whereNotNull('downloaded_at')->pluck('episode_number')->flip()->all();
+
         $toDownload = [];
         foreach ($torrentFiles as $file) {
-            $index = $file['index'] ?? $file['id'] ?? null;
+            $index = $file['index'] ?? null;
             if ($index === null) {
                 continue;
             }

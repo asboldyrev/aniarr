@@ -3,4 +3,4 @@
 use App\Jobs\RssCheckAndDownloadJob;
 use Illuminate\Support\Facades\Schedule;
 
-Schedule::job(new RssCheckAndDownloadJob)->everyThirtyMinutes();
+Schedule::job(RssCheckAndDownloadJob::class)->everyThirtyMinutes();
