@@ -22,7 +22,6 @@ class SeriesController extends Controller
             'title' => $request->title,
             'thetvdb_id' => $request->thetvdb_id,
             'thetvdb_slug' => $request->thetvdb_slug,
-            'rss_url' => $request->rss_url,
             'poster_url' => null,
             'poster_path' => null,
             'year' => $request->year,
@@ -32,7 +31,7 @@ class SeriesController extends Controller
 
         app(AniarrLogger::class)->setSeries($series->id);
 
-        $addSeries->execute($request->thetvdb_id, $request->rss_url, $series);
+        $addSeries->execute($request->thetvdb_id, $request->rss_feeds, $series);
 
         return response()->json(new SeriesResource($series), 201);
     }

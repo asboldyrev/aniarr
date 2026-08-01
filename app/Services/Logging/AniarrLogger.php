@@ -88,7 +88,7 @@ final class AniarrLogger
     /**
      * Записать ошибку исключения
      */
-    public function exception(Exception $exception, string|null $url = null): void
+    public function exception(Exception|Error $exception, string|null $url = null): void
     {
         if ($url) {
             $context['url'] = $url;

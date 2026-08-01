@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class SeriesResource extends JsonResource
@@ -19,9 +20,8 @@ class SeriesResource extends JsonResource
             'title' => $this->title,
             'thetvdbId' => $this->thetvdb_id,
             'thetvdbSlug' => $this->thetvdb_slug,
-            'rssUrl' => $this->rss_url,
             'posterUrl' => $this->poster_path
-                ? asset('storage/' . $this->poster_path)
+                ? asset('storage/'.$this->poster_path)
                 : $this->poster_url,
             'year' => $this->year,
             'status' => $this->status,
@@ -33,13 +33,22 @@ class SeriesResource extends JsonResource
             'lastUpdated' => $this->last_updated?->toIso8601String(),
             'errorMessage' => $this->error_message,
             'sonarrConnected' => $this->sonarr_connected,
+            'rssFeeds' => $this->rssFeeds->map(function ($feed) {
+                return [
+                    'id' => $feed->id,
+                    'seasonNumber' => $feed->season_number,
+                    'rssUrl' => $feed->rss_url,
+                    'lastRssHash' => $feed->last_rss_hash,
+                    'lastRssCheck' => $feed->last_rss_check?->toIso8601String(),
+                ];
+            }),
         ];
     }
 
     /**
      * Преобразовать коллекцию в массив
      */
-    public static function collection($resource): \Illuminate\Http\Resources\Json\AnonymousResourceCollection
+    public static function collection($resource): AnonymousResourceCollection
     {
         return parent::collection($resource);
     }

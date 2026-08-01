@@ -24,10 +24,10 @@ final class AddSeriesAction
      * Выполняет процесс добавления сериала.
      *
      * @param  int|string  $tvdbId  Идентификатор сериала в TVDB
-     * @param  string  $rssUrl  URL RSS-ленты для мониторинга торрентов
+     * @param  array  $rssFeeds  Массив RSS-лент для мониторинга торрентов
      * @param  Series|null  $series  Существующая модель сериала (опционально)
      */
-    public function execute(int|string $tvdbId, string $rssUrl, ?Series $series = null): void
+    public function execute(int|string $tvdbId, array $rssFeeds, ?Series $series = null): void
     {
         $tvdbClient = new TvdbClient;
         $tvdbData = $tvdbClient->getSeries($tvdbId);
@@ -40,10 +40,18 @@ final class AddSeriesAction
             ], [
                 'title' => self::getTitle($tvdbData),
                 'thetvdb_slug' => $tvdbData['slug'],
-                'rss_url' => $rssUrl,
                 'poster_url' => $posterUrl,
                 'year' => $tvdbData['year'],
                 'status' => Status::WAITING,
+            ]);
+        }
+
+        // Синхронизация RSS-лент
+        $series->rssFeeds()->delete();
+        foreach ($rssFeeds as $feed) {
+            $series->rssFeeds()->create([
+                'rss_url' => $feed['rss_url'],
+                'season_number' => $feed['season_number'] ?? null,
             ]);
         }
 

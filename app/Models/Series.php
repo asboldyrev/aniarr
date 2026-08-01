@@ -15,7 +15,6 @@ use Illuminate\Support\Carbon;
  * @property string $title
  * @property int $thetvdb_id
  * @property string $thetvdb_slug
- * @property string $rss_url
  * @property string|null $poster_url
  * @property string|null $poster_path
  * @property int|null $year
@@ -29,8 +28,6 @@ use Illuminate\Support\Carbon;
  * @property string|null $last_episodes
  * @property string|null $error_message
  * @property bool $sonarr_connected
- * @property Carbon|null $last_rss_check
- * @property string|null $last_rss_hash
  * @property bool $has_hevc
  * @property bool $has_avc
  * @property bool $upgrade_to_hevc
@@ -41,6 +38,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Torrent> $torrents
  * @property-read Collection<int, Torrent> $hevcTorrents
  * @property-read Collection<int, Torrent> $avcTorrents
+ * @property-read Collection<int, RssFeed> $rssFeeds
  */
 class Series extends Model
 {
@@ -56,7 +54,6 @@ class Series extends Model
         'title',
         'thetvdb_id',
         'thetvdb_slug',
-        'rss_url',
         'poster_url',
         'poster_path',
         'year',
@@ -70,8 +67,6 @@ class Series extends Model
         'last_episodes',
         'error_message',
         'sonarr_connected',
-        'last_rss_check',
-        'last_rss_hash',
         'has_hevc',
         'has_avc',
         'upgrade_to_hevc',
@@ -93,7 +88,6 @@ class Series extends Model
             'eta' => 'datetime',
             'active_download_is_hevc' => 'boolean',
             'sonarr_connected' => 'boolean',
-            'last_rss_check' => 'datetime',
             'has_hevc' => 'boolean',
             'has_avc' => 'boolean',
             'upgrade_to_hevc' => 'boolean',
@@ -138,6 +132,14 @@ class Series extends Model
     public function avcTorrents(): HasMany
     {
         return $this->hasMany(Torrent::class)->where('codec', 'AVC');
+    }
+
+    /**
+     * Получает RSS-ленты для сериала.
+     */
+    public function rssFeeds(): HasMany
+    {
+        return $this->hasMany(RssFeed::class);
     }
 
     /**

@@ -30,7 +30,7 @@ class SeriesUpdated implements ShouldBroadcastNow
         $channels = [new Channel('series')];
 
         if ($seriesId) {
-            $channels[] = new Channel('series.' . $seriesId);
+            $channels[] = new Channel('series.'.$seriesId);
         }
 
         return $channels;
@@ -54,9 +54,8 @@ class SeriesUpdated implements ShouldBroadcastNow
             'title' => $this->series->title,
             'thetvdbId' => $this->series->thetvdb_id,
             'thetvdbSlug' => $this->series->thetvdb_slug,
-            'rssUrl' => $this->series->rss_url,
             'posterUrl' => $this->series->poster_path
-                ? asset('storage/' . $this->series->poster_path)
+                ? asset('storage/'.$this->series->poster_path)
                 : $this->series->poster_url,
             'year' => $this->series->year,
             'status' => $this->series->status,
@@ -68,6 +67,15 @@ class SeriesUpdated implements ShouldBroadcastNow
             'lastUpdated' => $this->series->last_updated?->toIso8601String(),
             'errorMessage' => $this->series->error_message,
             'sonarrConnected' => $this->series->sonarr_connected,
+            'rssFeeds' => $this->series->rssFeeds->map(function ($feed) {
+                return [
+                    'id' => $feed->id,
+                    'seasonNumber' => $feed->season_number,
+                    'rssUrl' => $feed->rss_url,
+                    'lastRssHash' => $feed->last_rss_hash,
+                    'lastRssCheck' => $feed->last_rss_check?->toIso8601String(),
+                ];
+            }),
         ];
     }
 }

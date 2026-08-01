@@ -2,12 +2,12 @@
 
 namespace App\Services\Rss;
 
-use App\Models\Series;
+use App\Models\RssFeed;
 use App\Services\Rss\Dto\FeedItems;
 
 final class FeedChangesDetector
 {
-    public function hasChanged(Series $series, FeedItems $items): bool
+    public function hasChanged(RssFeed $rssFeed, FeedItems $items): bool
     {
         if (empty($items)) {
             return false;
@@ -15,21 +15,21 @@ final class FeedChangesDetector
 
         $latestGuid = $items[0]['guid'] ?? null;
 
-        return $series->last_rss_hash !== $latestGuid;
+        return $rssFeed->last_rss_hash !== $latestGuid;
     }
 
     /**
      * @return FeedItems
      */
-    public function getNewItems(Series $series, FeedItems $items): FeedItems
+    public function getNewItems(RssFeed $rssFeed, FeedItems $items): FeedItems
     {
-        if (empty($series->last_rss_hash)) {
+        if (empty($rssFeed->last_rss_hash)) {
             return $items;
         }
 
         $newItems = [];
         foreach ($items as $item) {
-            if ($item['guid'] === $series->last_rss_hash) {
+            if ($item['guid'] === $rssFeed->last_rss_hash) {
                 break;
             }
             $newItems[] = $item;
