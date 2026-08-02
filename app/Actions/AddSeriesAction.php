@@ -42,18 +42,18 @@ final class AddSeriesAction
                 'poster_url' => $posterUrl,
                 'year' => $tvdbData['year'],
                 'status' => Status::WAITING,
-                'codec' => 'AVC',
                 'last_updated' => now(),
             ]);
         }
 
+        app(AniarrLogger::class)->setSeries($series->id);
+
         // Синхронизация RSS-лент
         $series->rssFeeds()->delete();
-        dd($rssFeeds);
         foreach ($rssFeeds as $feed) {
             $series->rssFeeds()->create([
                 'rss_url' => $feed['rss_url'],
-                'season_number' => $feed['season_number'] ?? null,
+                'season_number' => $feed['season_number'] ?? 1,
             ]);
         }
 
@@ -61,8 +61,6 @@ final class AddSeriesAction
             $posterPath = DownloadPosterAction::execute($posterUrl, $series->id);
             $series->update(['poster_path' => $posterPath]);
         }
-
-        app(AniarrLogger::class)->setSeries($series->id);
 
         $sonarrClient = new SonarrClient;
 

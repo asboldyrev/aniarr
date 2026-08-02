@@ -45,8 +45,7 @@ class SyncSeriesWithSonarrJob implements ShouldQueue
             app(AniarrLogger::class)->error('Синхронизация с Sonar завершилась с ошибкой', $e);
             $series->update([
                 'status' => Status::ERROR,
-                'error_message' => 'Sync with Sonarr: '.$e->getMessage(),
-                'sonarr_connected' => false,
+                'sonar_id' => null,
                 'last_updated' => now(),
             ]);
 
@@ -57,24 +56,25 @@ class SyncSeriesWithSonarrJob implements ShouldQueue
     /**
      * Только синхронизировать данные из Sonarr в проект (для задачи). Сериал должен уже быть в Sonarr.
      */
-    public function runSyncFromSonarrOnly(SonarrClient $sonarrService, Series $series): void
+    public function runSyncFromSonarrOnly(SonarrClient $sonarrClient, Series $series): void
     {
-        $sonarrService = app(SonarrClient::class);
-        if (! $sonarrService->testConnection() || ! $series->thetvdb_id) {
-            $series->update(['sonarr_connected' => false, 'last_updated' => now()]);
+        $sonarrClient = app(SonarrClient::class);
+        if (! $sonarrClient->testConnection() || ! $series->thetvdb_id) {
+            $series->update(['sonar_id' => false, 'last_updated' => now()]);
 
             return;
         }
 
-        $seriesInSonarr = $sonarrService->findByTvdbId($series->thetvdb_id);
+        $seriesInSonarr = $sonarrClient->findByTvdbId($series->thetvdb_id);
+
         if ($seriesInSonarr === null) {
-            $series->update(['sonarr_connected' => false, 'last_updated' => now()]);
+            $series->update(['sonar_id' => false, 'last_updated' => now()]);
 
             return;
         }
 
-        (new SyncSeriesStateFromSonarrAction)->execute($series, $seriesInSonarr, $sonarrService);
-        $series->update(['sonarr_connected' => true, 'last_updated' => now()]);
+        (new SyncSeriesStateFromSonarrAction)->execute($series, $seriesInSonarr, $sonarrClient);
+        $series->update(['sonarr_id' => $seriesInSonarr->id, 'last_updated' => now()]);
 
         app(AniarrLogger::class)->success('Синхронизация с Sonarr прошла успешно');
 
