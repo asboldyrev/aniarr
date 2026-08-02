@@ -4,6 +4,7 @@ namespace App\Integrations\Sonarr;
 
 use App\Integrations\BaseApiClient;
 use App\Integrations\Sonarr\Dto\importFile;
+use App\Integrations\Sonarr\Dto\RootFolder;
 use App\Integrations\Sonarr\Dto\SonarrEpisode;
 use App\Integrations\Sonarr\Dto\SonarrSeries;
 use App\Models\Settings;
@@ -49,35 +50,29 @@ class SonarrClient extends BaseApiClient
     }
 
     /**
-     * Добавить аниме.
-     *
-     * @param  array  $data  Данные сериала
-     * @return array|null Данные созданного сериала
-     */
-    public function addSeries(array $data): ?array
-    {
-        $response = $this->post('series', $data);
-
-        return $response->successful() ? $response->json() : null;
-    }
-
-    /**
      * Добавить сериал в Sonarr по данным lookup (rootFolderPath и qualityProfileId обязательны).
      *
-     * @param  array  $lookupSeries  Данные сериала из поиска
+     * @param  SonarrSeries  $lookupSeries  Данные сериала из поиска
      * @param  string  $rootFolderPath  Путь к корневой папке
      * @param  int  $qualityProfileId  ID профиля качества
-     * @return array|null Данные созданного сериала
+     * @return SonarrSeries|null Данные созданного сериала
      */
-    public function addSeriesFromLookup(array $lookupSeries, string $rootFolderPath, int $qualityProfileId): ?array
+    public function addSeriesFromLookup(SonarrSeries $lookupSeries, string $rootFolderPath, int $qualityProfileId): ?SonarrSeries
     {
-        $payload = $lookupSeries;
+        $payload = $lookupSeries->toArray();
         $payload['rootFolderPath'] = $rootFolderPath;
         $payload['qualityProfileId'] = $qualityProfileId;
         $payload['monitored'] = $payload['monitored'] ?? true;
         $payload['addOptions'] = $payload['addOptions'] ?? ['searchForMissingEpisodes' => false];
 
-        return $this->addSeries($payload);
+        $response = $this->post('series', $payload);
+        $data = $response->json();
+
+        if ($response->successful() && !empty($data)) {
+            return SonarrSeries::makeFromResponse($data);
+        }
+
+        return null;
     }
 
     /**
@@ -192,14 +187,18 @@ class SonarrClient extends BaseApiClient
     /**
      * Получить корневые папки Sonarr.
      *
-     * @return array Корневые папки
+     * @return array<RootFolder> Корневые папки
      */
     public function getRootFolders(): array
     {
         $response = $this->get('rootFolder');
         $data = $response->successful() ? $response->json() : null;
 
-        return is_array($data) ? $data : [];
+        if (is_array($data)) {
+            return array_map(fn($folder) => RootFolder::makeFromResponse($folder), $data);
+        }
+
+        return [];
     }
 
     /**

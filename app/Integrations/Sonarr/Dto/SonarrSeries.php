@@ -3,8 +3,10 @@
 namespace App\Integrations\Sonarr\Dto;
 
 use Carbon\Carbon;
+use Illuminate\Contracts\Support\Arrayable;
+use Override;
 
-class SonarrSeries
+class SonarrSeries implements Arrayable
 {
     public function __construct(
         public readonly string $title,
@@ -103,5 +105,14 @@ class SonarrSeries
             languageProfileId: (int) ($response['languageProfileId'] ?? 0),
             id: (int) ($response['id'] ?? 0),
         );
+    }
+
+    /**
+     * @return array<string, int, bool, Carbon, array>
+     */
+    #[Override]
+    public function toArray(): array
+    {
+        return get_object_vars($this);
     }
 }

@@ -49,12 +49,14 @@ final class AddSeriesAction
         app(AniarrLogger::class)->setSeries($series->id);
 
         // Синхронизация RSS-лент
-        $series->rssFeeds()->delete();
         foreach ($rssFeeds as $feed) {
-            $series->rssFeeds()->create([
-                'rss_url' => $feed['rss_url'],
+            $bdFeed = $series->rssFeeds()->firstOrNew([
                 'season_number' => $feed['season_number'] ?? 1,
             ]);
+
+            $bdFeed->rss_url = $feed['rss_url'];
+
+            $bdFeed->save();
         }
 
         if (! $series->poster_path) {
