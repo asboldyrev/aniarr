@@ -16,7 +16,6 @@ return new class extends Migration
             $table->foreignId('series_id')->constrained('series')->cascadeOnDelete();
             $table->integer('season_number')->nullable();
             $table->string('rss_url', 500);
-            $table->string('last_rss_hash')->nullable();
             $table->timestamp('last_rss_check')->nullable();
             $table->timestamps();
 

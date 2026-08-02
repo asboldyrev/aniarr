@@ -2,23 +2,30 @@
 
 namespace App\Models;
 
+use App\Enums\Codec;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
  * @property int $series_id
- * @property string $guid
+ * @property int|null $rss_feed_id
+ * @property int|null $season_number
  * @property string $torrent_url
  * @property string|null $torrent_id
  * @property string $codec
  * @property array $episodes
- * @property int $size
+ * @property int|null $progress
+ * @property int|null $eta
  * @property bool $downloaded
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Series $series
+ * @property-read RssFeed|null $rssFeed
+ * @property-read Collection<int, EpisodeDownload> $episodeDownloads
  * @property-read string $episode_range
  */
 class Torrent extends Model
@@ -30,12 +37,14 @@ class Torrent extends Model
      */
     protected $fillable = [
         'series_id',
-        'guid',
+        'rss_feed_id',
+        'season_number',
         'torrent_url',
         'torrent_id',
         'codec',
         'episodes',
-        'size',
+        'progress',
+        'eta',
         'downloaded',
     ];
 
@@ -47,9 +56,13 @@ class Torrent extends Model
     protected function casts(): array
     {
         return [
+            'rss_feed_id' => 'integer',
+            'season_number' => 'integer',
             'episodes' => 'array',
-            'size' => 'integer',
+            'progress' => 'integer',
+            'eta' => 'integer',
             'downloaded' => 'boolean',
+            'codec' => Codec::class,
         ];
     }
 
@@ -62,30 +75,10 @@ class Torrent extends Model
     }
 
     /**
-     * Get episode range as string like "1-12"
+     * Get the RSS feed that this torrent came from.
      */
-    public function getEpisodeRangeAttribute(): string
+    public function rssFeed(): BelongsTo
     {
-        $episodes = $this->episodes;
-        if (empty($episodes)) {
-            return 'unknown';
-        }
-
-        $min = min($episodes);
-        $max = max($episodes);
-
-        if ($min === $max) {
-            return (string) $min;
-        }
-
-        return "{$min}-{$max}";
-    }
-
-    /**
-     * Check if this torrent has specific episodes
-     */
-    public function hasEpisodes(array $episodeNumbers): bool
-    {
-        return ! empty(array_intersect($this->episodes, $episodeNumbers));
+        return $this->belongsTo(RssFeed::class);
     }
 }

@@ -31,7 +31,6 @@ final class AddSeriesAction
     {
         $tvdbClient = new TvdbClient;
         $tvdbData = $tvdbClient->getSeries($tvdbId);
-
         $posterUrl = $tvdbClient->getPoster($tvdbId);
 
         if (! $series) {
@@ -43,11 +42,14 @@ final class AddSeriesAction
                 'poster_url' => $posterUrl,
                 'year' => $tvdbData['year'],
                 'status' => Status::WAITING,
+                'codec' => 'AVC',
+                'last_updated' => now(),
             ]);
         }
 
         // Синхронизация RSS-лент
         $series->rssFeeds()->delete();
+        dd($rssFeeds);
         foreach ($rssFeeds as $feed) {
             $series->rssFeeds()->create([
                 'rss_url' => $feed['rss_url'],

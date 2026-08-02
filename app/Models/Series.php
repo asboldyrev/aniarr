@@ -11,26 +11,15 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
- * @property int|null $sonarr_id
  * @property string $title
+ * @property int|null $sonarr_id
  * @property int $thetvdb_id
  * @property string $thetvdb_slug
  * @property string|null $poster_url
  * @property string|null $poster_path
  * @property int|null $year
  * @property Status $status
- * @property int|null $progress
- * @property Carbon|null $eta
- * @property string|null $active_torrent_hash
- * @property string|null $active_download_path
- * @property bool $active_download_is_hevc
- * @property string $codec
- * @property string|null $last_episodes
- * @property string|null $error_message
- * @property bool $sonarr_connected
- * @property bool $has_hevc
- * @property bool $has_avc
- * @property bool $upgrade_to_hevc
+ * @property Carbon|null $last_updated
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Collection<int, Episode> $episodes
@@ -39,6 +28,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, Torrent> $hevcTorrents
  * @property-read Collection<int, Torrent> $avcTorrents
  * @property-read Collection<int, RssFeed> $rssFeeds
+ * @property-read Collection<int, EpisodeDownload> $episodeDownloads
  */
 class Series extends Model
 {
@@ -50,26 +40,15 @@ class Series extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'sonarr_id',
         'title',
+        'sonarr_id',
         'thetvdb_id',
         'thetvdb_slug',
         'poster_url',
         'poster_path',
         'year',
         'status',
-        'progress',
-        'eta',
-        'active_torrent_hash',
-        'active_download_path',
-        'active_download_is_hevc',
-        'codec',
-        'last_episodes',
-        'error_message',
-        'sonarr_connected',
-        'has_hevc',
-        'has_avc',
-        'upgrade_to_hevc',
+        'last_updated',
     ];
 
     /**
@@ -84,13 +63,7 @@ class Series extends Model
             'thetvdb_id' => 'integer',
             'year' => 'integer',
             'status' => Status::class,
-            'progress' => 'integer',
-            'eta' => 'datetime',
-            'active_download_is_hevc' => 'boolean',
-            'sonarr_connected' => 'boolean',
-            'has_hevc' => 'boolean',
-            'has_avc' => 'boolean',
-            'upgrade_to_hevc' => 'boolean',
+            'last_updated' => 'datetime',
         ];
     }
 
@@ -119,22 +92,6 @@ class Series extends Model
     }
 
     /**
-     * Получает HEVC торренты для сериала.
-     */
-    public function hevcTorrents(): HasMany
-    {
-        return $this->hasMany(Torrent::class)->where('codec', 'HEVC');
-    }
-
-    /**
-     * Получает AVC торренты для сериала.
-     */
-    public function avcTorrents(): HasMany
-    {
-        return $this->hasMany(Torrent::class)->where('codec', 'AVC');
-    }
-
-    /**
      * Получает RSS-ленты для сериала.
      */
     public function rssFeeds(): HasMany
@@ -147,6 +104,6 @@ class Series extends Model
      */
     public function qbitTag(): string
     {
-        return 'aniarr-'.$this->id;
+        return 'aniarr-' . $this->id;
     }
 }

@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
  * @property int $series_id
  * @property string $message
  * @property LogType $type
+ * @property array|null $context
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Series $series
@@ -30,6 +31,7 @@ class ActivityLog extends Model
         'series_id',
         'message',
         'type',
+        'context',
     ];
 
     /**
@@ -41,6 +43,7 @@ class ActivityLog extends Model
     {
         return [
             'type' => LogType::class,
+            'context' => 'array',
         ];
     }
 
