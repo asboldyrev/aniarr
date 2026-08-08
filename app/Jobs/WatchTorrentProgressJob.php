@@ -3,8 +3,11 @@
 namespace App\Jobs;
 
 use App\Events\SeriesUpdated;
+use App\Integrations\QBittorrent\Dto\File;
+use App\Integrations\QBittorrent\Dto\Torrent as DtoTorrent;
 use App\Integrations\QBittorrent\QBittorrentClient;
 use App\Models\Series;
+use App\Models\Torrent;
 use App\Services\Logging\AniarrLogger;
 use App\Services\Rss\RssParser;
 use App\Services\SeriesStatsBroadcaster;
@@ -33,16 +36,16 @@ class WatchTorrentProgressJob implements ShouldBeUnique, ShouldQueue
      * Создаёт новый экземпляр задачи.
      */
     public function __construct(
-        public int $seriesId
+        public int $torrentId
     ) {}
 
     /**
      * Выполняет задачу.
      */
-    public function handle(QBittorrentClient $qBittorrentClient, RssParser $rssParser): void
+    public function handle(QBittorrentClient $qBittorrentClient): void
     {
-        $series = Series::find($this->seriesId);
-        if (! $series || ! $series->active_torrent_hash) {
+        $torrent = Torrent::find($this->torrentId);
+        if (! $torrent || ! $torrent->active_torrent_hash) {
             return;
         }
 
@@ -50,34 +53,30 @@ class WatchTorrentProgressJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $hash = $series->active_torrent_hash;
+        $hash = $torrent->active_torrent_hash;
 
         try {
-            $torrents = $qBittorrentClient->getTorrentsByTag($series->qbitTag());
+            $torrents = $qBittorrentClient->getTorrentsByTag($torrent->qbitTag());
         } catch (\Throwable $e) {
             app(AniarrLogger::class)->exception($e);
         }
 
-        $torrent = array_shift($torrents) ?? null;
+        /** @var DtoTorrent $current */
+        $current = array_find($torrents ?? [], fn($torrent) => ($torrent->hash ?? '') === $hash);
 
-        $current = null;
-        if (($torrent['hash'] ?? '') === $hash) {
-            $current = $torrent;
-        }
-
-        if ($current === null) {
+        if (empty($current)) {
             app(AniarrLogger::class)->info('[WatchTorrent] Торрент не найден в qBittorrent, выход', ['hash' => $hash]);
             $this->release(5);
 
             return;
         }
 
-        $progress = (int) round((float) ($current['progress'] ?? 0) * 100);
-        $eta = $current['eta'] ?? 0; // в секундах
-        $state = $current['state'] ?? '';
+        $progress = (int) round((float) ($current->progress ?? 0) * 100);
+        $eta = $current->eta ?? 0; // в секундах
+        $state = $current->state ?? '';
 
-        $series->update(['progress' => $progress, 'eta' => $eta, 'last_updated' => now()]);
-        broadcast(new SeriesUpdated($series->fresh()))->toOthers();
+        $torrent->update(['progress' => $progress, 'eta' => max(16_777_215, $eta), 'last_updated' => now()]);
+        broadcast(new SeriesUpdated($torrent->series))->toOthers();
         app(SeriesStatsBroadcaster::class)->broadcast();
 
         $isDone = $progress >= 100 || in_array($state, ['completed', 'stalledUP', 'stoppedUp'], true);
@@ -97,23 +96,24 @@ class WatchTorrentProgressJob implements ShouldBeUnique, ShouldQueue
             'state' => $state,
         ]);
 
-        $contentPath = $current['content_path'] ?? null;
-        if ($contentPath === null || $contentPath === '') {
-            $savePath = rtrim($current['save_path'] ?? '', '/');
-            $name = $current['name'] ?? '';
-            if ($savePath !== '' && $name !== '') {
+        $contentPath = $current->content_path ?? null;
+        if (empty($contentPath)) {
+            $savePath = rtrim($current->save_path ?? '', '/');
+            $name = $current->name ?? '';
+
+            if (!empty($savePath) && empty($name)) {
                 $contentPath = $savePath . '/' . $name;
             }
         }
 
-        if ($contentPath !== null && $contentPath !== '') {
+        if (!empty($contentPath)) {
             $files = $qBittorrentClient->getTorrentFiles($hash);
             $files = collect($files)
-                ->filter(function (array $file) {
-                    return $file['priority'] !== 0;
+                ->filter(function (File $file) {
+                    return $file->priority !== 0;
                 })
-                ->map(function (array $file) use ($current) {
-                    $file['path'] = $current['save_path'] . '/' . $file['name'];
+                ->map(function (File $file) use ($current) {
+                    $file->path = $current->save_path . '/' . $file->name;
 
                     return $file;
                 })->values()->toArray();
@@ -126,11 +126,11 @@ class WatchTorrentProgressJob implements ShouldBeUnique, ShouldQueue
             ]);
 
             if (! empty($contentPath)) {
-                $series->update(['active_download_path' => $contentPath, 'last_updated' => now()]);
+                $torrent->update(['active_download_path' => $contentPath, 'last_updated' => now()]);
             }
 
             // Запускаем только импорт в Sonarr. Удаление торрента будет выполнено после успешного импорта
-            ImportDownloadToSonarrJob::dispatch($series->id, $files)->onQueue('downloads');
+            ImportDownloadToSonarrJob::dispatch($torrent->id, $files)->onQueue('downloads');
         }
     }
 
@@ -139,7 +139,7 @@ class WatchTorrentProgressJob implements ShouldBeUnique, ShouldQueue
      */
     public function uniqueId(): string
     {
-        return 'watch-torrent:' . $this->seriesId;
+        return 'watch-torrent:' . $this->torrentId;
     }
 
     /**

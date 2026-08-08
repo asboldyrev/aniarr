@@ -4,6 +4,8 @@ namespace App\Integrations\QBittorrent;
 
 use App\Exceptions\BaseUrlNotConfigured;
 use App\Integrations\BaseApiClient;
+use App\Integrations\QBittorrent\Dto\File;
+use App\Integrations\QBittorrent\Dto\Torrent;
 use App\Models\Settings;
 use App\Support\Formatting\TransferFormatter;
 use Illuminate\Http\Client\Response;
@@ -73,6 +75,11 @@ class QBittorrentClient extends BaseApiClient
         }
 
         $params = array_merge(['urls' => $url], $options);
+
+        $category = Settings::get('qbittorrent_category');
+        if ($category) {
+            $params['category'] = $category;
+        }
 
         $response = Http::withHeaders($this->getHeaders())
             ->asForm()
@@ -221,7 +228,7 @@ class QBittorrentClient extends BaseApiClient
      * Получает список файлов торрента.
      *
      * @param  string  $hash  Хэш торрента
-     * @return array Список файлов с индексом, именем, размером, прогрессом, приоритетом
+     * @return array<File> Список файлов с индексом, именем, размером, прогрессом, приоритетом
      */
     public function getTorrentFiles(string $hash): array
     {
@@ -233,28 +240,24 @@ class QBittorrentClient extends BaseApiClient
             return [];
         }
 
-        return array_map(function ($file) {
-            return [
-                'index' => $file['index'] ?? 0,
-                'name' => $file['name'] ?? '',
-                'size' => $file['size'] ?? 0,
-                'progress' => $file['progress'] ?? 0,
-                'priority' => $file['priority'] ?? 0,
-            ];
-        }, $response);
+        return array_map(fn($file) => File::makeFromResponse($file), $response);
     }
 
     /**
      * Получить список всех торрентов с тегом.
      *
      * @param  string  $tag  Тег для фильтрации
-     * @return array Список торрентов
+     * @return array<Torrent> Список торрентов
      */
     public function getTorrentsByTag(string $tag): array
     {
         $response = $this->get('/api/v2/torrents/info', ['tag' => $tag]);
 
-        return $response->successful() ? $response->json() : [];
+        if ($response->successful()) {
+            return array_map(fn($torrent) => Torrent::makeFromResponse($torrent), $response->json());
+        }
+
+        return [];
     }
 
     /**
@@ -265,9 +268,7 @@ class QBittorrentClient extends BaseApiClient
      */
     public function deleteTags(string $tag): bool
     {
-        $response = $this->post('/api/v2/torrents/deleteTags', [
-            'form' => ['tags' => $tag],
-        ]);
+        $response = $this->post('/api/v2/torrents/deleteTags', ['tags' => $tag]);
 
         return $response->successful();
     }

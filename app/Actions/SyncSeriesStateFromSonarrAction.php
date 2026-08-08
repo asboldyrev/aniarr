@@ -48,6 +48,9 @@ class SyncSeriesStateFromSonarrAction
             if ($sonarrEpisode->hasFile) {
                 $episode->codec = $this->getEpisodeFileCodec($sonarrEpisode->episodeFile);
                 $episode->downloaded_at = $sonarrEpisode->episodeFile->dateAdded;
+            } else {
+                $episode->codec = 'hevc';
+                $episode->downloaded_at = null;
             }
 
             $episode->save();

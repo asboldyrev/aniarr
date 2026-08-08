@@ -98,12 +98,4 @@ class Series extends Model
     {
         return $this->hasMany(RssFeed::class);
     }
-
-    /**
-     * Генерирует тег для qBittorrent на основе ID сериала.
-     */
-    public function qbitTag(): string
-    {
-        return 'aniarr-' . $this->id;
-    }
 }

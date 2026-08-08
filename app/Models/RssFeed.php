@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
  * @property int $series_id
  * @property int|null $season_number
  * @property string $rss_url
+ * @property string|null $last_rss_hash
  * @property Carbon|null $last_rss_check
  * @property Carbon $created_at
  * @property Carbon $updated_at
@@ -30,6 +31,7 @@ class RssFeed extends Model
         'series_id',
         'season_number',
         'rss_url',
+        'last_rss_hash',
         'last_rss_check',
     ];
 
@@ -53,13 +55,5 @@ class RssFeed extends Model
     public function series(): BelongsTo
     {
         return $this->belongsTo(Series::class);
-    }
-
-    /**
-     * Get the torrents that came from this RSS feed.
-     */
-    public function torrents(): HasMany
-    {
-        return $this->hasMany(Torrent::class);
     }
 }

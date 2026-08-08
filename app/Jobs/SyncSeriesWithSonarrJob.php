@@ -76,7 +76,7 @@ class SyncSeriesWithSonarrJob implements ShouldQueue
         (new SyncSeriesStateFromSonarrAction)->execute($series, $seriesInSonarr, $sonarrClient);
         $series->update(['sonarr_id' => $seriesInSonarr->id, 'last_updated' => now()]);
 
-        app(AniarrLogger::class)->success('Синхронизация с Sonarr прошла успешно');
+        app(AniarrLogger::class)->info('Синхронизация с Sonarr прошла успешно');
 
         event(new SeriesUpdated($series->fresh()));
 

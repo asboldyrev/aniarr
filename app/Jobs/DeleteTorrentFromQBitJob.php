@@ -6,6 +6,7 @@ use App\Enums\Status;
 use App\Events\SeriesUpdated;
 use App\Integrations\QBittorrent\QBittorrentClient;
 use App\Models\Series;
+use App\Models\Torrent;
 use App\Services\Logging\AniarrLogger;
 use App\Services\SeriesStatsBroadcaster;
 use Illuminate\Bus\Queueable;
@@ -28,7 +29,7 @@ class DeleteTorrentFromQBitJob implements ShouldQueue
      * @param  int  $seriesId  Идентификатор сериала
      */
     public function __construct(
-        public int $seriesId
+        public int $torrentId
     ) {}
 
     /**
@@ -38,14 +39,14 @@ class DeleteTorrentFromQBitJob implements ShouldQueue
      */
     public function handle(QBittorrentClient $qBittorrentClient): void
     {
-        $series = Series::find($this->seriesId);
-        if (! $series) {
-            app(AniarrLogger::class)->warning('[DeleteQBit] Сериал не найден', ['series_id' => $this->seriesId]);
+        $torrent = Torrent::find($this->torrentId);
+        if (! $torrent) {
+            app(AniarrLogger::class)->warning('[DeleteQBit] Сериал не найден', ['series_id' => $this->torrentId]);
 
             return;
         }
 
-        $hash = $series->active_torrent_hash;
+        $hash = $torrent->active_torrent_hash;
         $hasHash = $hash !== null && $hash !== '';
 
         app(AniarrLogger::class)->info('[DeleteQBit] Старт', [
@@ -55,7 +56,7 @@ class DeleteTorrentFromQBitJob implements ShouldQueue
 
         if ($hasHash && $qBittorrentClient->login()) {
             $deleted = $qBittorrentClient->deleteTorrent($hash);
-            $qBittorrentClient->deleteTags($series->qbitTag());
+            $qBittorrentClient->deleteTags($torrent->qbitTag());
             app(AniarrLogger::class)->info('[DeleteQBit] Удаление торрента из qBittorrent', [
                 'hash' => $hash,
                 'delete_files' => true,
@@ -65,16 +66,11 @@ class DeleteTorrentFromQBitJob implements ShouldQueue
             app(AniarrLogger::class)->info('[DeleteQBit] Пропуск удаления (нет hash или qBit не залогинен)');
         }
 
-        $series->update([
+        $torrent->update([
+            'downloaded' => true,
             'active_torrent_hash' => null,
-            'active_download_path' => null,
-            'active_download_is_hevc' => false,
-            'progress' => null,
-            'eta' => null,
-            'status' => Status::DONE,
-            'last_updated' => now(),
         ]);
-        broadcast(new SeriesUpdated($series->fresh()))->toOthers();
+        broadcast(new SeriesUpdated($torrent->series))->toOthers();
         SeriesStatsBroadcaster::broadcast();
     }
 }

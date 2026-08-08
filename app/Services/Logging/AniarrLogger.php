@@ -7,6 +7,7 @@ use App\Exceptions\BadMethodCallException;
 use App\Models\Series;
 use Error;
 use Exception;
+use Illuminate\Support\Str;
 
 /**
  * @method void error(string $message, Exception|Error|array $context = [])
@@ -75,7 +76,7 @@ final class AniarrLogger
 
         if (!empty($this->series)) {
             $this->series->activityLogs()->create([
-                'message' => $message,
+                'message' => Str::limit($message, 250),
                 'type' => $level,
             ]);
         }

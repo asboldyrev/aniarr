@@ -3,6 +3,7 @@
 namespace App\Services\Rss;
 
 use App\Models\RssFeed;
+use App\Services\Rss\Dto\FeedItem;
 use App\Services\Rss\Dto\FeedItems;
 
 final class FeedChangesDetector
@@ -13,9 +14,7 @@ final class FeedChangesDetector
             return false;
         }
 
-        $latestGuid = $items[0]['guid'] ?? null;
-
-        return $rssFeed->last_rss_hash !== $latestGuid;
+        return array_any($items->items, fn(FeedItem $item) => $item->guid != $rssFeed->last_rss_check);
     }
 
     /**
@@ -27,13 +26,7 @@ final class FeedChangesDetector
             return $items;
         }
 
-        $newItems = [];
-        foreach ($items as $item) {
-            if ($item['guid'] === $rssFeed->last_rss_hash) {
-                break;
-            }
-            $newItems[] = $item;
-        }
+        $newItems = array_filter($items->items, fn(FeedItem $item) => $item->guid !== $rssFeed->last_rss_hash);
 
         return new FeedItems($newItems);
     }

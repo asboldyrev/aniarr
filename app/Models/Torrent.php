@@ -12,20 +12,16 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int $series_id
- * @property int|null $rss_feed_id
  * @property int|null $season_number
  * @property string $torrent_url
  * @property string|null $torrent_id
  * @property string $codec
- * @property array $episodes
  * @property int|null $progress
  * @property int|null $eta
  * @property bool $downloaded
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Series $series
- * @property-read RssFeed|null $rssFeed
- * @property-read Collection<int, EpisodeDownload> $episodeDownloads
  * @property-read string $episode_range
  */
 class Torrent extends Model
@@ -36,16 +32,15 @@ class Torrent extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'series_id',
         'rss_feed_id',
         'season_number',
         'torrent_url',
         'torrent_id',
         'codec',
-        'episodes',
         'progress',
         'eta',
         'downloaded',
+        'active_torrent_hash'
     ];
 
     /**
@@ -58,7 +53,6 @@ class Torrent extends Model
         return [
             'rss_feed_id' => 'integer',
             'season_number' => 'integer',
-            'episodes' => 'array',
             'progress' => 'integer',
             'eta' => 'integer',
             'downloaded' => 'boolean',
@@ -74,11 +68,17 @@ class Torrent extends Model
         return $this->belongsTo(Series::class);
     }
 
-    /**
-     * Get the RSS feed that this torrent came from.
-     */
-    public function rssFeed(): BelongsTo
+    public function episodes(): HasMany
     {
-        return $this->belongsTo(RssFeed::class);
+        return $this->hasMany(Episode::class);
+    }
+
+    /**
+     * Генерирует тег для qBittorrent на основе ID сериала.
+     * @deprecated
+     */
+    public function qbitTag(): string
+    {
+        return "aniarr-{$this->series_id}-{$this->season_number}";
     }
 }
