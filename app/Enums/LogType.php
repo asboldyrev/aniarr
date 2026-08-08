@@ -4,16 +4,16 @@ namespace App\Enums;
 
 enum LogType: string
 {
+    case DEBUG = 'debug';
     case INFO = 'info';
-    case SUCCESS = 'success';
     case WARNING = 'warning';
     case ERROR = 'error';
 
     public static function all(): array
     {
         return [
+            self::DEBUG,
             self::INFO,
-            self::SUCCESS,
             self::WARNING,
             self::ERROR,
         ];
@@ -22,8 +22,8 @@ enum LogType: string
     public static function color(): string
     {
         return match (self::class) {
-            self::INFO => 'gray',
-            self::SUCCESS => 'green',
+            self::DEBUG => 'gray',
+            self::INFO => 'green',
             self::WARNING => 'yellow',
             self::ERROR => 'red',
         };
@@ -32,8 +32,8 @@ enum LogType: string
     public static function label(): string
     {
         return match (self::class) {
+            self::DEBUG => 'Отладка',
             self::INFO => 'Информация',
-            self::SUCCESS => 'Успех',
             self::WARNING => 'Предупреждение',
             self::ERROR => 'Ошибка',
         };

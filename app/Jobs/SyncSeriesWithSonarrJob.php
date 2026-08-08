@@ -42,7 +42,7 @@ class SyncSeriesWithSonarrJob implements ShouldQueue
         try {
             $this->runSyncFromSonarrOnly($sonarrService, $series);
         } catch (\Throwable $e) {
-            app(AniarrLogger::class)->error('Синхронизация с Sonar завершилась с ошибкой', $e);
+            app(AniarrLogger::class)->error('[Sonarr] Синхронизация с Sonar завершилась с ошибкой', $e);
             $series->update([
                 'status' => Status::ERROR,
                 'sonar_id' => null,
@@ -76,7 +76,7 @@ class SyncSeriesWithSonarrJob implements ShouldQueue
         (new SyncSeriesStateFromSonarrAction)->execute($series, $seriesInSonarr, $sonarrClient);
         $series->update(['sonarr_id' => $seriesInSonarr->id, 'last_updated' => now()]);
 
-        app(AniarrLogger::class)->info('Синхронизация с Sonarr прошла успешно');
+        app(AniarrLogger::class)->info('[Sonarr] Синхронизация с Sonarr прошла успешно');
 
         event(new SeriesUpdated($series->fresh()));
 

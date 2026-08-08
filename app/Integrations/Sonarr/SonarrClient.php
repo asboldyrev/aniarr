@@ -95,7 +95,7 @@ class SonarrClient extends BaseApiClient
 
         $response = $this->post('command', $body);
         if (! $response->successful()) {
-            app(AniarrLogger::class)->warning('[SonarrService] ManualImport ошибка', [
+            app(AniarrLogger::class)->warning('[Sonarr] ошибка импорта', [
                 'status' => $response->status(),
                 'body' => $response->body(),
                 'files_count' => count($files),

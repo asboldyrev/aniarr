@@ -29,7 +29,7 @@ class RssParser
             $response = Http::timeout(30)->get($url);
 
             if ($response->failed()) {
-                app(AniarrLogger::class)->error('Запрос RSS-ленты завершился ошибкой: '.$response->status());
+                app(AniarrLogger::class)->error('[RSS] Запрос завершился ошибкой: ' . $response->status());
 
                 return new FeedItems([]);
             }
@@ -37,7 +37,7 @@ class RssParser
             $xml = simplexml_load_string($response->body(), 'SimpleXMLElement', LIBXML_NOCDATA);
 
             if ($xml === false) {
-                app(AniarrLogger::class)->error('Ошибка парсинга RSS-ленты: '.$response->status());
+                app(AniarrLogger::class)->error('[RSS] Ошибка парсинга ленты: ' . $response->status());
 
                 return new FeedItems([]);
             }

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('series_id')->constrained('series');
             $table->string('message');
-            $table->enum('type', ['info', 'success', 'warning', 'error'])->default('info');
+            $table->enum('type', ['info', 'warning', 'error'])->default('info');
             $table->json('context')->nullable();
             $table->timestamps();
         });

@@ -41,7 +41,7 @@ class DeleteTorrentFromQBitJob implements ShouldQueue
     {
         $torrent = Torrent::find($this->torrentId);
         if (! $torrent) {
-            app(AniarrLogger::class)->warning('[DeleteQBit] Сериал не найден', ['series_id' => $this->torrentId]);
+            app(AniarrLogger::class)->warning('[QBittorrent] Сериал не найден', ['series_id' => $this->torrentId]);
 
             return;
         }
@@ -49,7 +49,7 @@ class DeleteTorrentFromQBitJob implements ShouldQueue
         $hash = $torrent->active_torrent_hash;
         $hasHash = $hash !== null && $hash !== '';
 
-        app(AniarrLogger::class)->info('[DeleteQBit] Старт', [
+        app(AniarrLogger::class)->info('[QBittorrent] Старт удаления', [
             'hash' => $hash,
             'hash_empty' => ! $hasHash,
         ]);
@@ -57,13 +57,13 @@ class DeleteTorrentFromQBitJob implements ShouldQueue
         if ($hasHash && $qBittorrentClient->login()) {
             $deleted = $qBittorrentClient->deleteTorrent($hash);
             $qBittorrentClient->deleteTags($torrent->qbitTag());
-            app(AniarrLogger::class)->info('[DeleteQBit] Удаление торрента из qBittorrent', [
+            app(AniarrLogger::class)->info('[QBittorrent] Удаление торрента из qBittorrent', [
                 'hash' => $hash,
                 'delete_files' => true,
                 'result' => $deleted,
             ]);
         } else {
-            app(AniarrLogger::class)->info('[DeleteQBit] Пропуск удаления (нет hash или qBit не залогинен)');
+            app(AniarrLogger::class)->warning('[QBittorrent] Пропуск удаления (нет hash или qBit не залогинен)');
         }
 
         $torrent->update([

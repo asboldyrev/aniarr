@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Enums\Status;
 use App\Events\SeriesUpdated;
 use App\Integrations\QBittorrent\Dto\File;
 use App\Integrations\QBittorrent\Dto\Torrent;
@@ -16,7 +15,6 @@ use App\Models\Settings;
 use App\Models\Torrent as ModelsTorrent;
 use App\Services\Logging\AniarrLogger;
 use App\Services\Rss\BestTorrentPicker;
-use App\Services\Rss\Dto\FeedItem;
 use App\Services\Rss\FeedChangesDetector;
 use App\Services\Rss\RssParser;
 use App\Services\SeriesStatsBroadcaster;
@@ -59,7 +57,7 @@ class RssCheckAndDownloadJob implements ShouldQueue
         }
 
         if ($savePath === '') {
-            $logger->error('Ошибка: не настроен путь сохранения.');
+            $logger->error('[Sonarr] Ошибка: не настроен путь сохранения.');
 
             return;
         }
@@ -92,14 +90,14 @@ class RssCheckAndDownloadJob implements ShouldQueue
                 try {
                     $parseItems = $rssParser->parseFeed($rssFeed->rss_url);
                     if (empty($parseItems->items)) {
-                        $logger->warning('Проверка пропущена: отсутствует данные в RSS-ленте', ['rss_url' => $rssFeed->rss_url]);
+                        $logger->warning('[RSS] Проверка пропущена: отсутствует данные в RSS-ленте', ['rss_url' => $rssFeed->rss_url]);
 
                         continue;
                     }
 
                     $detector = app(FeedChangesDetector::class);
                     if (! $detector->hasChanged($rssFeed, $parseItems)) {
-                        $logger->info('RSS-лента не изменилась', ['rss_url' => $rssFeed->rss_url]);
+                        $logger->info('[RSS] RSS-лента не изменилась', ['rss_url' => $rssFeed->rss_url]);
 
                         continue;
                     }
@@ -107,14 +105,14 @@ class RssCheckAndDownloadJob implements ShouldQueue
                     $newItems = $detector->getNewItems($rssFeed, $parseItems);
                     $picked = app(BestTorrentPicker::class)->pick($newItems);
                     if ($picked === null) {
-                        $logger->warning('Проверка пропущена: не найден подходящий torrent-файл', ['rss_url' => $rssFeed->rss_url]);
+                        $logger->warning('[Torrent] Проверка пропущена: не найден подходящий torrent-файл', ['rss_url' => $rssFeed->rss_url]);
 
                         continue;
                     }
 
                     $tag = $this->getTag($series, $rssFeed);
 
-                    $logger->info('Добавление торрента', ['url' => $picked->torrentUrl, 'tag' => $tag, 'rss_url' => $rssFeed->rss_url]);
+                    $logger->info('[Torrent] Добавление торрента', ['url' => $picked->torrentUrl, 'tag' => $tag, 'rss_url' => $rssFeed->rss_url]);
 
                     $qBittorrentClient->addTorrentUrl($picked->torrentUrl, [
                         'stopped' => 'true', // Важное уточнение: в новой версии API параметр `paused` был заменён на `stopped`. https://github.com/qbittorrent/qBittorrent/issues/22766
@@ -124,12 +122,12 @@ class RssCheckAndDownloadJob implements ShouldQueue
                     sleep(2);
 
                     $torrents = $qBittorrentClient->getTorrentsByTag($tag);
-                    $logger->info('Результат getTorrentsByTag', ['tag' => $tag, 'count' => count($torrents), 'hashes' => array_column($torrents, 'hash')]);
+                    $logger->debug('[Torrent] Результат getTorrentsByTag', ['tag' => $tag, 'count' => count($torrents), 'hashes' => array_column($torrents, 'hash')]);
                     /** @var Torrent $firstTorrent */
                     $firstTorrent = $torrents[0] ?? null;
 
                     if ($firstTorrent === null) {
-                        $logger->error('Ошибка добавления торрента. Не найден торрент');
+                        $logger->error('[Torrent] Ошибка добавления торрента. Не найден торрент');
 
                         continue;
                     }
@@ -137,7 +135,7 @@ class RssCheckAndDownloadJob implements ShouldQueue
                     $hash = $firstTorrent->hash ?? '';
 
                     if (empty($hash)) {
-                        $logger->error('Ошибка добавления торрента. Отсутствует хеш торрента');
+                        $logger->error('[Torrent] Ошибка добавления торрента. Отсутствует хеш торрента');
 
                         continue;
                     }
@@ -145,7 +143,7 @@ class RssCheckAndDownloadJob implements ShouldQueue
                     $files = $this->waitForTorrentFiles($qBittorrentClient, $hash);
 
                     if (empty($files)) {
-                        $logger->error('Не удалось настроить приоритеты файлов в torrent. Загрузка отменена');
+                        $logger->error('[Torrent] Не удалось настроить приоритеты файлов в torrent. Загрузка отменена');
                         $qBittorrentClient->deleteTorrent($hash);
 
                         continue;
@@ -178,7 +176,7 @@ class RssCheckAndDownloadJob implements ShouldQueue
 
                     $qBittorrentClient->startTorrent($hash);
 
-                    $logger->info('Торрент начал загрузку', ['codec' => $picked->codec]);
+                    $logger->info('[Torrent] Торрент начал загрузку', ['codec' => $picked->codec]);
                     broadcast(new SeriesUpdated($series->fresh()))->toOthers();
                     app(SeriesStatsBroadcaster::class)->broadcast();
 
@@ -191,7 +189,7 @@ class RssCheckAndDownloadJob implements ShouldQueue
             }
 
             if (! $feedProcessed) {
-                $logger->info('Ни одна RSS-лента не подошла для сериала', ['series_id' => $series->id]);
+                $logger->warning('[RSS] Ни одна RSS-лента не подошла для сериала', ['series_id' => $series->id]);
             }
         }
     }

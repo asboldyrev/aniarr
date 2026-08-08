@@ -73,7 +73,7 @@ class ImportDownloadToSonarrJob implements ShouldQueue
         $logger = app(AniarrLogger::class);
         $path = $torrent->active_download_path;
 
-        $logger->info('[ImportSonarr] Джоба стартовала', [
+        $logger->debug('[Torrent] Джоба стартовала', [
             'active_torrent_hash' => $torrent->active_torrent_hash,
             'active_download_path_raw' => $path,
             'path_is_empty' => $path === null || $path === '',
@@ -87,13 +87,13 @@ class ImportDownloadToSonarrJob implements ShouldQueue
 
         try {
             $sonarrOk = $sonarrClient->testConnection();
-            $logger->info('[ImportSonarr] Перед вызовом Sonarr API', [
+            $logger->debug('[Sonarr] Перед вызовом Sonarr API', [
                 'sonarr_test_connection' => $sonarrOk,
                 'files_count' => count($this->files),
             ]);
 
             if (! $sonarrOk) {
-                $logger->warning('[ImportSonarr] Sonarr не подключен');
+                $logger->error('[Sonarr] Sonarr не подключен');
                 throw new RuntimeException('Sonarr не подключен');
             }
 
@@ -101,7 +101,7 @@ class ImportDownloadToSonarrJob implements ShouldQueue
             $command = $this->tryManualImportCommand($sonarrClient, $torrent);
 
             if (empty($command)) {
-                $logger->warning('[ImportSonarr] Sonarr не вернул command id');
+                $logger->error('[Sonarr] Sonarr не вернул command id');
                 throw new RuntimeException('Sonarr не вернул command id (нет файлов с эпизодами)');
             }
 
@@ -135,7 +135,7 @@ class ImportDownloadToSonarrJob implements ShouldQueue
             // После успешного импорта в Sonarr и синхронизации с Jellyfin запускаем удаление торрента
             DeleteTorrentFromQBitJob::dispatch($this->torrentId)->onQueue('downloads');
 
-            $logger->info('[ImportSonarr] Импорт успешно завершен, запущено удаление торрента');
+            $logger->info('[Sonarr] Импорт успешно завершен, запущено удаление торрента');
         } catch (Throwable $e) {
             $logger->exception($e);
             $torrent->series->update([
@@ -189,14 +189,14 @@ class ImportDownloadToSonarrJob implements ShouldQueue
         }
 
         if (empty($commandFiles)) {
-            app(AniarrLogger::class)->info('[ImportSonarr] Нет файлов с эпизодами, fallback на scan');
+            app(AniarrLogger::class)->warning('[Sonarr] Нет файлов с эпизодами, fallback на scan');
 
             return null;
         }
 
         $command = $sonarrClient->sendManualImportCommand($commandFiles, 'move');
 
-        app(AniarrLogger::class)->info('[ImportSonarr] Ответ Sonarr ManualImport', [
+        app(AniarrLogger::class)->debug('[Sonarr] Ответ Sonarr ManualImport', [
             'command_id' => $command['id'] ?? null,
             'files_count' => count($commandFiles),
         ]);
@@ -221,7 +221,7 @@ class ImportDownloadToSonarrJob implements ShouldQueue
             $pollCount++;
             $cmd = $sonarrClient->getCommand($commandId);
             if ($cmd === null) {
-                app(AniarrLogger::class)->debug('[ImportSonarr] Poll command: getCommand вернул null', [
+                app(AniarrLogger::class)->debug('[Sonarr] Poll command: getCommand вернул null', [
                     'command_id' => $commandId,
                     'poll' => $pollCount,
                 ]);
@@ -230,15 +230,17 @@ class ImportDownloadToSonarrJob implements ShouldQueue
             }
             $status = $cmd['status'] ?? '';
             if ($pollCount <= 2 || $status === 'completed' || $status === 'failed') {
-                app(AniarrLogger::class)->info('[ImportSonarr] Статус команды Sonarr', [
+                app(AniarrLogger::class)->info('[Sonarr] Статус команды Sonarr', [
                     'command_id' => $commandId,
                     'status' => $status,
                     'poll' => $pollCount,
                     'body' => $cmd['body'] ?? null,
                 ]);
             }
+
             if ($status === 'completed' || $status === 'failed') {
-                app(AniarrLogger::class)->info('[ImportSonarr] Команда Sonarr завершена', [
+                $method = $status === 'completed' ? 'info' : 'error';
+                app(AniarrLogger::class)->{$method}('[Sonarr] Команда Sonarr завершена', [
                     'command_id' => $commandId,
                     'status' => $status,
                     'full_command_response' => $cmd,
@@ -247,7 +249,7 @@ class ImportDownloadToSonarrJob implements ShouldQueue
                 return $status;
             }
         }
-        app(AniarrLogger::class)->warning('[ImportSonarr] Таймаут ожидания команды Sonarr', [
+        app(AniarrLogger::class)->warning('[Sonarr] Таймаут ожидания команды Sonarr', [
             'command_id' => $commandId,
             'polls' => $pollCount,
         ]);

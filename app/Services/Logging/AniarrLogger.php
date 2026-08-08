@@ -10,10 +10,10 @@ use Exception;
 use Illuminate\Support\Str;
 
 /**
- * @method void error(string $message, Exception|Error|array $context = [])
- * @method void warning(string $message, Exception|Error|array $context = [])
- * @method void success(string $message, Exception|Error|array $context = [])
+ * @method void debug(string $message, Exception|Error|array $context = [])
  * @method void info(string $message, Exception|Error|array $context = [])
+ * @method void warning(string $message, Exception|Error|array $context = [])
+ * @method void error(string $message, Exception|Error|array $context = [])
  */
 final class AniarrLogger
 {
@@ -74,11 +74,15 @@ final class AniarrLogger
         }
 
 
-        if (!empty($this->series)) {
+        if (!empty($this->series) && $level != LogType::DEBUG) {
             $this->series->activityLogs()->create([
                 'message' => Str::limit($message, 250),
                 'type' => $level,
             ]);
+        }
+
+        if ($level == LogType::DEBUG && app()->isProduction()) {
+            return;
         }
 
         $logPath = storage_path('logs/aniarr.log');

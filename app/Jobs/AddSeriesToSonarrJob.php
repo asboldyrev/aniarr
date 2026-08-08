@@ -53,7 +53,7 @@ class AddSeriesToSonarrJob implements ShouldQueue
 
         $series->update(['sonarr_id' => $seriesInSonarr->id, 'last_updated' => now()]);
 
-        app(AniarrLogger::class)->success('Сериал добавлен в Sonarr');
+        app(AniarrLogger::class)->info('[Sonarr] Сериал добавлен в Sonarr');
     }
 
     /**
@@ -68,7 +68,7 @@ class AddSeriesToSonarrJob implements ShouldQueue
         $thetvdbId = $series->thetvdb_id;
         $lookup = $sonarrClient->findByTvdbId($thetvdbId);
         if (! $lookup) {
-            app(AniarrLogger::class)->warning('Сериал не найден в Sonarr');
+            app(AniarrLogger::class)->warning('[Sonarr] Сериал не найден в Sonarr');
 
             return null;
         }
@@ -76,7 +76,7 @@ class AddSeriesToSonarrJob implements ShouldQueue
         $rootFolders = $sonarrClient->getRootFolders();
         $rootPath = array_find($rootFolders, fn($folder) => !empty($folder))?->path ?? null;
         if ($rootPath === null) {
-            app(AniarrLogger::class)->warning('Не найдены корневые директории в Sonarr');
+            app(AniarrLogger::class)->warning('[Sonarr] Не найдены корневые директории в Sonarr');
 
             return null;
         }
@@ -84,7 +84,7 @@ class AddSeriesToSonarrJob implements ShouldQueue
         $qualityProfiles = $sonarrClient->getQualityProfiles();
         $qualityProfileId = array_find($qualityProfiles, fn($profile) => !empty($profile['id']))['id'] ?? null;
         if ($qualityProfileId === null) {
-            app(AniarrLogger::class)->warning('Не найдены профили качества в Sonarr');
+            app(AniarrLogger::class)->warning('[Sonarr] Не найдены профили качества в Sonarr');
 
             return null;
         }

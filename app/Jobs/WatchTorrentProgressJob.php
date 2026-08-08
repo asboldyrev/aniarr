@@ -65,7 +65,7 @@ class WatchTorrentProgressJob implements ShouldBeUnique, ShouldQueue
         $current = array_find($torrents ?? [], fn($torrent) => ($torrent->hash ?? '') === $hash);
 
         if (empty($current)) {
-            app(AniarrLogger::class)->info('[WatchTorrent] Торрент не найден в qBittorrent, выход', ['hash' => $hash]);
+            app(AniarrLogger::class)->warning('[Torrent] Торрент не найден в qBittorrent, выход', ['hash' => $hash]);
             $this->release(5);
 
             return;
@@ -90,7 +90,7 @@ class WatchTorrentProgressJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        app(AniarrLogger::class)->info('[WatchTorrent] Загрузка 100%, собираем путь', [
+        app(AniarrLogger::class)->info('[Torrent] Загрузка 100%, собираем путь', [
             'hash' => $hash,
             'progress' => $progress,
             'state' => $state,
@@ -120,7 +120,7 @@ class WatchTorrentProgressJob implements ShouldBeUnique, ShouldQueue
         }
 
         if (! empty($files)) {
-            app(AniarrLogger::class)->info('[WatchTorrent] Путь для Sonarr сохранён', [
+            app(AniarrLogger::class)->info('[Torrent] Путь для Sonarr сохранён', [
                 'active_download_path' => $contentPath,
                 'path_length' => $contentPath !== null ? strlen($contentPath) : 0,
             ]);
