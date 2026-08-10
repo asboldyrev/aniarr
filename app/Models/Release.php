@@ -23,6 +23,8 @@ use Illuminate\Support\Carbon;
  * @property int $last_episode
  * @property int|null $size_bytes
  * @property Carbon|null $published_at
+ * @property bool $is_current
+ * @property Carbon|null $last_seen_at
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read RssFeed $rssFeed
@@ -43,6 +45,8 @@ class Release extends Model
         'last_episode',
         'size_bytes',
         'published_at',
+        'is_current',
+        'last_seen_at',
     ];
 
     protected function casts(): array
@@ -54,6 +58,8 @@ class Release extends Model
             'last_episode' => 'integer',
             'size_bytes' => 'integer',
             'published_at' => 'datetime',
+            'is_current' => 'boolean',
+            'last_seen_at' => 'datetime',
         ];
     }
 
