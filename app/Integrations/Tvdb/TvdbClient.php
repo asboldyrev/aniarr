@@ -19,32 +19,34 @@ class TvdbClient extends BaseApiClient
 
     protected string $locale = 'eng';
 
+    protected string $fallbackLocale = 'eng';
+
     /**
-     * Получить данные по сериалу
+     * Получить данные по сериалу вместе с основной и fallback локализациями.
      */
     public function getSeries(int|string $id): array
     {
-        $cacheKey = 'thetvdb:getSeries:'.md5($id.':'.$this->locale);
+        $cacheKey = 'thetvdb:getSeries:'.md5(
+            $id.':'.$this->locale.':'.$this->fallbackLocale,
+        );
 
         return Cache::remember($cacheKey, 3600, function () use ($id) {
             try {
                 $response = $this->get('series/'.$id);
-                $translation = $this->get(sprintf('series/%s/translations/%s', $id, $this->locale));
+                $data = $response->json('data');
 
-                if ($response->successful() && $translation->successful()) {
-                    $data = $response->json('data');
-
-                    if (empty($data)) {
-                        return [];
-                    }
-
-                    $data['translation'] = $translation->json('data');
-
-                    return $data;
+                if (! is_array($data) || $data === []) {
+                    return [];
                 }
 
-                return [];
-            } catch (\Exception $e) {
+                $data['translations'] = [];
+
+                foreach (array_unique([$this->locale, $this->fallbackLocale]) as $locale) {
+                    $data['translations'][$locale] = $this->getSeriesTranslation($id, $locale);
+                }
+
+                return $data;
+            } catch (\Throwable $e) {
                 app(AniarrLogger::class)->exception($e);
 
                 return [];
@@ -140,8 +142,9 @@ class TvdbClient extends BaseApiClient
         $this->apiKey = Settings::get('thetvdb_api_key', '');
         $this->pin = Settings::get('thetvdb_pin', null);
 
-        $appLocale = config('app.locale', 'en');
-        $this->locale = app(TvdbLocaleMapper::class)->map($appLocale);
+        $localeMapper = app(TvdbLocaleMapper::class);
+        $this->locale = $localeMapper->map(config('app.locale', 'en'));
+        $this->fallbackLocale = $localeMapper->map(config('app.fallback_locale', 'en'));
 
         $this->login();
     }
@@ -192,6 +195,32 @@ class TvdbClient extends BaseApiClient
             app(AniarrLogger::class)->exception($e);
 
             return false;
+        }
+    }
+
+    /**
+     * Получить перевод сериала. Отсутствующий перевод — нормальная ситуация.
+     */
+    private function getSeriesTranslation(int|string $seriesId, string $locale): array
+    {
+        try {
+            $response = $this->get(sprintf(
+                'series/%s/translations/%s',
+                $seriesId,
+                $locale,
+            ));
+
+            $data = $response->json('data');
+
+            return is_array($data) ? $data : [];
+        } catch (\Throwable $e) {
+            app(AniarrLogger::class)->debug('[TVDB] Локализация сериала недоступна', [
+                'series_id' => $seriesId,
+                'locale' => $locale,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
         }
     }
 
