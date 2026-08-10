@@ -4,7 +4,6 @@ namespace App\Services\Downloads;
 
 use App\Enums\Codec;
 use App\Enums\DownloadReason;
-use App\Enums\DownloadStatus;
 use App\Models\Episode;
 use App\Models\Release;
 use App\Models\Season;
@@ -70,15 +69,8 @@ final class SeasonDownloadPlanner
 
     private function hasActiveDownload(Season $season): bool
     {
-        $activeStatuses = [
-            DownloadStatus::PENDING,
-            DownloadStatus::PREPARING,
-            DownloadStatus::DOWNLOADING,
-            DownloadStatus::IMPORTING,
-        ];
-
         return $season->downloads->contains(
-            fn ($download): bool => in_array($download->status, $activeStatuses, true),
+            fn ($download): bool => $download->status->isActive(),
         );
     }
 
