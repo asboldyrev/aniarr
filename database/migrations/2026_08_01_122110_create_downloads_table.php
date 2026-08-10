@@ -22,7 +22,7 @@ return new class extends Migration
                 'cancelled',
                 'failed',
             ])->default('pending')->index();
-            $table->string('qbit_hash')->nullable()->unique();
+            $table->string('qbit_hash')->nullable()->index();
             $table->string('qbit_tag')->nullable();
             $table->unsignedTinyInteger('progress')->nullable();
             $table->unsignedMediumInteger('eta_seconds')->nullable();
