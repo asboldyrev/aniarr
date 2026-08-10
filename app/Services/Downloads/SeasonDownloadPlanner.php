@@ -36,8 +36,8 @@ final class SeasonDownloadPlanner
         }
 
         $releases = $season->rssFeed->releases
-            ->filter(fn(Release $release): bool => $release->is_current)
-            ->sortByDesc(fn(Release $release): int => $release->published_at?->getTimestamp() ?? $release->id)
+            ->filter(fn (Release $release): bool => $release->is_current)
+            ->sortByDesc(fn (Release $release): int => $release->published_at?->getTimestamp() ?? $release->id)
             ->values();
 
         if ($releases->isEmpty()) {
@@ -48,7 +48,7 @@ final class SeasonDownloadPlanner
         $avcPlans = $this->plansForCodec($season->episodes, $releases, Codec::AVC);
 
         $hevcWithMissing = $this->bestPlan(
-            $hevcPlans->filter(fn(DownloadPlan $plan): bool => $this->hasReason($plan, DownloadReason::MISSING)),
+            $hevcPlans->filter(fn (DownloadPlan $plan): bool => $this->hasReason($plan, DownloadReason::MISSING)),
         );
 
         if ($hevcWithMissing !== null) {
@@ -56,7 +56,7 @@ final class SeasonDownloadPlanner
         }
 
         $avcWithMissing = $this->bestPlan(
-            $avcPlans->filter(fn(DownloadPlan $plan): bool => $this->hasReason($plan, DownloadReason::MISSING)),
+            $avcPlans->filter(fn (DownloadPlan $plan): bool => $this->hasReason($plan, DownloadReason::MISSING)),
         );
 
         if ($avcWithMissing !== null) {
@@ -64,7 +64,7 @@ final class SeasonDownloadPlanner
         }
 
         return $this->bestPlan(
-            $hevcPlans->filter(fn(DownloadPlan $plan): bool => $this->hasReason($plan, DownloadReason::UPGRADE)),
+            $hevcPlans->filter(fn (DownloadPlan $plan): bool => $this->hasReason($plan, DownloadReason::UPGRADE)),
         );
     }
 
@@ -78,7 +78,7 @@ final class SeasonDownloadPlanner
         ];
 
         return $season->downloads->contains(
-            fn($download): bool => in_array($download->status, $activeStatuses, true),
+            fn ($download): bool => in_array($download->status, $activeStatuses, true),
         );
     }
 
@@ -90,10 +90,10 @@ final class SeasonDownloadPlanner
     private function plansForCodec(Collection $episodes, Collection $releases, Codec $codec): Collection
     {
         return $releases
-            ->filter(fn(Release $release): bool => $release->codec === $codec)
+            ->filter(fn (Release $release): bool => $release->codec === $codec)
             ->map(function (Release $release) use ($episodes, $codec): ?DownloadPlan {
                 $items = $episodes
-                    ->filter(fn(Episode $episode): bool => $this->releaseCoversEpisode($release, $episode))
+                    ->filter(fn (Episode $episode): bool => $this->releaseCoversEpisode($release, $episode))
                     ->map(function (Episode $episode) use ($codec): ?DownloadPlanItem {
                         if (! $episode->has_file) {
                             return new DownloadPlanItem($episode, DownloadReason::MISSING);

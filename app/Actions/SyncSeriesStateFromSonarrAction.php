@@ -70,9 +70,9 @@ final class SyncSeriesStateFromSonarrAction
     private function syncSeasons(Series $series, SonarrSeries $sonarrSeries, array $sonarrEpisodes): array
     {
         $seasonNumbers = collect($sonarrSeries->seasons)
-            ->map(fn(array $season): int => (int) ($season['seasonNumber'] ?? -1))
-            ->merge(array_map(fn(SonarrEpisode $episode): int => $episode->seasonNumber, $sonarrEpisodes))
-            ->filter(fn(int $seasonNumber): bool => $seasonNumber >= 0)
+            ->map(fn (array $season): int => (int) ($season['seasonNumber'] ?? -1))
+            ->merge(array_map(fn (SonarrEpisode $episode): int => $episode->seasonNumber, $sonarrEpisodes))
+            ->filter(fn (int $seasonNumber): bool => $seasonNumber >= 0)
             ->unique()
             ->sort()
             ->values();

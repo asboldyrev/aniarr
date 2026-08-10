@@ -38,7 +38,7 @@ class CreateDownloadFromPlanActionTest extends TestCase
         $this->assertNotNull($download);
         $this->assertSame(DownloadStatus::PENDING, $download->status);
         $this->assertSame(DownloadTrigger::AUTOMATIC, $download->trigger);
-        $this->assertSame('aniarr-download-' . $download->id, $download->qbit_tag);
+        $this->assertSame('aniarr-download-'.$download->id, $download->qbit_tag);
         $this->assertDatabaseHas('download_items', [
             'download_id' => $download->id,
             'episode_id' => $episode->id,
@@ -47,7 +47,7 @@ class CreateDownloadFromPlanActionTest extends TestCase
 
         Queue::assertPushed(
             PrepareDownloadJob::class,
-            fn(PrepareDownloadJob $job): bool => $job->downloadId === $download->id,
+            fn (PrepareDownloadJob $job): bool => $job->downloadId === $download->id,
         );
     }
 
@@ -101,9 +101,9 @@ class CreateDownloadFromPlanActionTest extends TestCase
     private function domain(int $tvdbId = 101): array
     {
         $series = Series::query()->create([
-            'title' => 'Series ' . $tvdbId,
+            'title' => 'Series '.$tvdbId,
             'thetvdb_id' => $tvdbId,
-            'thetvdb_slug' => 'series-' . $tvdbId,
+            'thetvdb_slug' => 'series-'.$tvdbId,
             'monitored' => true,
         ]);
 
@@ -113,14 +113,14 @@ class CreateDownloadFromPlanActionTest extends TestCase
         ]);
 
         $feed = $season->rssFeed()->create([
-            'rss_url' => 'https://example.test/' . $tvdbId . '.xml',
+            'rss_url' => 'https://example.test/'.$tvdbId.'.xml',
             'enabled' => true,
         ]);
 
         $release = $feed->releases()->create([
-            'guid' => 'release-' . $tvdbId,
+            'guid' => 'release-'.$tvdbId,
             'title' => 'Release',
-            'torrent_url' => 'https://example.test/' . $tvdbId . '.torrent',
+            'torrent_url' => 'https://example.test/'.$tvdbId.'.torrent',
             'codec' => Codec::HEVC,
             'first_episode' => 1,
             'last_episode' => 12,

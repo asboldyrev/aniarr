@@ -50,7 +50,7 @@ class SonarrClient extends BaseApiClient
      */
     public function findByTvdbId(int $tvdbId): ?SonarrSeries
     {
-        $response = $this->get('series/lookup', ['term' => 'tvdb:' . $tvdbId]);
+        $response = $this->get('series/lookup', ['term' => 'tvdb:'.$tvdbId]);
         $data = $response->successful() ? $response->json() : null;
 
         if (is_array($data) && ! empty($data)) {
@@ -101,7 +101,7 @@ class SonarrClient extends BaseApiClient
         $body = [
             'name' => 'ManualImport',
             'importMode' => $importMode,
-            'files' => array_map(fn(importFile $item) => $item->toArray(), $files),
+            'files' => array_map(fn (importFile $item) => $item->toArray(), $files),
         ];
 
         $response = $this->post('command', $body);
@@ -154,7 +154,7 @@ class SonarrClient extends BaseApiClient
             throw new RuntimeException('Sonarr вернул некорректный ответ со списком эпизодов');
         }
 
-        return array_map(fn($episode) => SonarrEpisode::makeFromResponse($episode), $episodes);
+        return array_map(fn ($episode) => SonarrEpisode::makeFromResponse($episode), $episodes);
     }
 
     /**
@@ -165,7 +165,7 @@ class SonarrClient extends BaseApiClient
      */
     public function findEpisodeBySonarrId(int $sonarrId): ?array
     {
-        $response = $this->get('episode/' . $sonarrId);
+        $response = $this->get('episode/'.$sonarrId);
 
         return $response->successful() ? $response->json() : null;
     }
@@ -214,7 +214,7 @@ class SonarrClient extends BaseApiClient
         $data = $response->successful() ? $response->json() : null;
 
         if (is_array($data)) {
-            return array_map(fn($folder) => RootFolder::makeFromResponse($folder), $data);
+            return array_map(fn ($folder) => RootFolder::makeFromResponse($folder), $data);
         }
 
         return [];
@@ -225,7 +225,7 @@ class SonarrClient extends BaseApiClient
      */
     protected function loadSettings(): void
     {
-        $this->baseUrl = Settings::get('sonarr_url', '') . '/api/v3';
+        $this->baseUrl = Settings::get('sonarr_url', '').'/api/v3';
         $this->apiKey = Settings::get('sonarr_api_key', '');
     }
 

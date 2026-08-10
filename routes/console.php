@@ -9,15 +9,15 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::call(function (): void {
     RssFeed::query()
         ->where('enabled', true)
-        ->whereHas('season', fn($query) => $query->where('monitored', true))
-        ->whereHas('season.series', fn($query) => $query->where('monitored', true))
+        ->whereHas('season', fn ($query) => $query->where('monitored', true))
+        ->whereHas('season.series', fn ($query) => $query->where('monitored', true))
         ->pluck('id')
-        ->each(fn(int $rssFeedId) => SyncRssFeedJob::dispatch($rssFeedId));
+        ->each(fn (int $rssFeedId) => SyncRssFeedJob::dispatch($rssFeedId));
 })->name('SyncRssFeeds')->everyThirtyMinutes();
 
 Schedule::call(function (): void {
     Series::query()
         ->where('monitored', true)
         ->pluck('id')
-        ->each(fn(int $seriesId) => SyncSeriesWithSonarrJob::dispatch($seriesId));
+        ->each(fn (int $seriesId) => SyncSeriesWithSonarrJob::dispatch($seriesId));
 })->name('SyncSeriesWithSonarr')->hourly();

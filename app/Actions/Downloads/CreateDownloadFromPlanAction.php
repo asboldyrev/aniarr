@@ -36,7 +36,7 @@ final class CreateDownloadFromPlanAction
             }
 
             $hasActiveDownload = $lockedSeason->downloads()
-                ->whereIn('status', array_map(fn(DownloadStatus $status) => $status->value, self::ACTIVE_STATUSES))
+                ->whereIn('status', array_map(fn (DownloadStatus $status) => $status->value, self::ACTIVE_STATUSES))
                 ->exists();
 
             if ($hasActiveDownload) {
@@ -79,7 +79,7 @@ final class CreateDownloadFromPlanAction
             ]);
 
             $download->update([
-                'qbit_tag' => 'aniarr-download-' . $download->id,
+                'qbit_tag' => 'aniarr-download-'.$download->id,
             ]);
 
             foreach ($plan->items as $item) {

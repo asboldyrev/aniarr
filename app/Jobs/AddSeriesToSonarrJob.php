@@ -64,7 +64,7 @@ final class AddSeriesToSonarrJob implements ShouldQueue
         }
 
         $rootFolders = $sonarrClient->getRootFolders();
-        $rootPath = array_find($rootFolders, fn($folder) => ! empty($folder))?->path ?? null;
+        $rootPath = array_find($rootFolders, fn ($folder) => ! empty($folder))?->path ?? null;
         if ($rootPath === null) {
             app(AniarrLogger::class)->warning('[Sonarr] Не найдены корневые директории Sonarr');
 
@@ -72,7 +72,7 @@ final class AddSeriesToSonarrJob implements ShouldQueue
         }
 
         $qualityProfiles = $sonarrClient->getQualityProfiles();
-        $qualityProfileId = array_find($qualityProfiles, fn($profile) => ! empty($profile['id']))['id'] ?? null;
+        $qualityProfileId = array_find($qualityProfiles, fn ($profile) => ! empty($profile['id']))['id'] ?? null;
         if ($qualityProfileId === null) {
             app(AniarrLogger::class)->warning('[Sonarr] Не найдены профили качества Sonarr');
 

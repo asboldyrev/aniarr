@@ -71,7 +71,7 @@ abstract class BaseApiClient
             throw new \RuntimeException('Base URL не настроен');
         }
 
-        $url = rtrim($this->baseUrl, '/') . '/' . ltrim($endpoint, '/');
+        $url = rtrim($this->baseUrl, '/').'/'.ltrim($endpoint, '/');
 
         $timeout = $options['timeout'] ?? 10;
         unset($options['timeout']);

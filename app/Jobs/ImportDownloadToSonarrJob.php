@@ -23,6 +23,7 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     private const SONARR_COMMAND_TIMEOUT = 300;
+
     private const POLL_INTERVAL = 3;
 
     public int $tries = 5;
@@ -96,13 +97,13 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
             foreach ($download->items as $item) {
                 if (! $item->episode->has_file) {
                     throw new RuntimeException(
-                        'Sonarr не подтвердил файл эпизода ' . $item->episode->episode_number . '.',
+                        'Sonarr не подтвердил файл эпизода '.$item->episode->episode_number.'.',
                     );
                 }
 
                 if ($item->episode->file_codec !== $download->release->codec) {
                     throw new RuntimeException(
-                        'Codec эпизода ' . $item->episode->episode_number . ' не соответствует импортированному Release.',
+                        'Codec эпизода '.$item->episode->episode_number.' не соответствует импортированному Release.',
                     );
                 }
             }
@@ -164,7 +165,7 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
             }
 
             $files[] = new importFile(
-                path: $savePath . '/' . ltrim($item->torrent_file_name, '/'),
+                path: $savePath.'/'.ltrim($item->torrent_file_name, '/'),
                 seriesId: $seriesId,
                 seasonNumber: $download->season->number,
                 episodeId: $episode->sonarr_id,

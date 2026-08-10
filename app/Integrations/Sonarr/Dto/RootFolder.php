@@ -12,7 +12,6 @@ class RootFolder
         public readonly int $id,
     ) {}
 
-
     public static function makeFromResponse(array $response): self
     {
         return new self(

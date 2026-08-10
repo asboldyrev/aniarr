@@ -55,7 +55,7 @@ final class PrepareDownloadJob implements ShouldQueue
                 'error_message' => null,
             ]);
 
-            $tag = $download->qbit_tag ?: 'aniarr-download-' . $download->id;
+            $tag = $download->qbit_tag ?: 'aniarr-download-'.$download->id;
             $download->update(['qbit_tag' => $tag]);
 
             $torrent = $this->resolveTorrent($download, $qBittorrentClient, $tag);
@@ -79,11 +79,11 @@ final class PrepareDownloadJob implements ShouldQueue
 
             $selectedFiles = array_values(array_filter(
                 $files,
-                fn(File $file): bool => in_array($file->index, $indexesToDownload, true),
+                fn (File $file): bool => in_array($file->index, $indexesToDownload, true),
             ));
             $skippedFiles = array_values(array_filter(
                 $files,
-                fn(File $file): bool => ! in_array($file->index, $indexesToDownload, true),
+                fn (File $file): bool => ! in_array($file->index, $indexesToDownload, true),
             ));
 
             $this->persistSelectedFiles($download, $selectedFiles);
@@ -91,7 +91,7 @@ final class PrepareDownloadJob implements ShouldQueue
             if ($selectedFiles !== []) {
                 $ok = $qBittorrentClient->setFilePriority(
                     $hash,
-                    implode('|', array_map(fn(File $file): int => $file->index, $selectedFiles)),
+                    implode('|', array_map(fn (File $file): int => $file->index, $selectedFiles)),
                     7,
                 );
                 if (! $ok) {
@@ -102,7 +102,7 @@ final class PrepareDownloadJob implements ShouldQueue
             if ($skippedFiles !== []) {
                 $ok = $qBittorrentClient->setFilePriority(
                     $hash,
-                    implode('|', array_map(fn(File $file): int => $file->index, $skippedFiles)),
+                    implode('|', array_map(fn (File $file): int => $file->index, $skippedFiles)),
                     0,
                 );
                 if (! $ok) {
@@ -144,7 +144,7 @@ final class PrepareDownloadJob implements ShouldQueue
         if ($download->qbit_hash) {
             $matched = array_find(
                 $existing,
-                fn(QBitTorrent $torrent): bool => $torrent->hash === $download->qbit_hash,
+                fn (QBitTorrent $torrent): bool => $torrent->hash === $download->qbit_hash,
             );
             if ($matched !== null) {
                 return $matched;
@@ -210,7 +210,7 @@ final class PrepareDownloadJob implements ShouldQueue
             $file = $byEpisode[$item->episode->episode_number] ?? null;
             if ($file === null) {
                 throw new RuntimeException(
-                    'Не найден файл для эпизода ' . $item->episode->episode_number . '.',
+                    'Не найден файл для эпизода '.$item->episode->episode_number.'.',
                 );
             }
 

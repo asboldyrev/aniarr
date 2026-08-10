@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
  */
 final class AniarrLogger
 {
-    protected Series|null $series;
+    protected ?Series $series;
 
     public function setSeries(Series|int $id): void
     {
@@ -48,7 +48,7 @@ final class AniarrLogger
      */
     public function log(LogType $level, string $message, Exception|Error|array $context = []): void
     {
-        if (is_array($context) && !empty($context)) {
+        if (is_array($context) && ! empty($context)) {
             $context = json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         } elseif (is_array($context)) {
             $context = '';
@@ -66,15 +66,14 @@ final class AniarrLogger
             );
         } else {
             $formatted = sprintf(
-                "[%s] %s: %s",
+                '[%s] %s: %s',
                 now()->format('Y-m-d H:i:s'),
                 $level->name,
                 $message
             );
         }
 
-
-        if (!empty($this->series) && $level != LogType::DEBUG) {
+        if (! empty($this->series) && $level != LogType::DEBUG) {
             $this->series->activityLogs()->create([
                 'message' => Str::limit($message, 250),
                 'type' => $level,
@@ -93,7 +92,7 @@ final class AniarrLogger
     /**
      * Записать ошибку исключения
      */
-    public function exception(Exception|Error $exception, string|null $url = null): void
+    public function exception(Exception|Error $exception, ?string $url = null): void
     {
         if ($url) {
             $context['url'] = $url;
@@ -111,7 +110,7 @@ final class AniarrLogger
             $exception->getTraceAsString(),
         ];
 
-        if (!$short) {
+        if (! $short) {
             array_unshift($result, "{$exception->getMessage()}. Code: {$exception->getCode()}");
         }
 

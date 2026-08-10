@@ -14,7 +14,7 @@ final class FeedFingerprint
     public function make(FeedItems $items): string
     {
         $normalized = array_map(
-            fn(FeedItem $item): array => [
+            fn (FeedItem $item): array => [
                 'guid' => $item->guid,
                 'title' => $item->title,
                 'torrent_id' => $item->torrentId,

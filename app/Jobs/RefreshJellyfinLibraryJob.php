@@ -39,6 +39,7 @@ final class RefreshJellyfinLibraryJob implements ShouldQueue
         try {
             if (! $jellyfinClient->testConnection()) {
                 $logger->warning('[Jellyfin] Обновление библиотеки пропущено: сервис недоступен');
+
                 return;
             }
 

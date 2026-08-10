@@ -40,7 +40,7 @@ final class PlanSeasonDownloadsJob implements ShouldBeUnique, ShouldQueue
 
     public function uniqueId(): string
     {
-        return 'plan-season-downloads:' . $this->seasonId;
+        return 'plan-season-downloads:'.$this->seasonId;
     }
 
     public function uniqueFor(): int

@@ -44,6 +44,7 @@ final class WatchDownloadProgressJob implements ShouldBeUnique, ShouldQueue
         try {
             if (! $qBittorrentClient->login()) {
                 $this->release(5);
+
                 return;
             }
 
@@ -54,6 +55,7 @@ final class WatchDownloadProgressJob implements ShouldBeUnique, ShouldQueue
                     'hash' => $download->qbit_hash,
                 ]);
                 $this->release(5);
+
                 return;
             }
 
@@ -74,6 +76,7 @@ final class WatchDownloadProgressJob implements ShouldBeUnique, ShouldQueue
             if (! $isDone) {
                 $delay = (int) max(1, min(15, ceil(max(1, $eta) / 7200)));
                 $this->release($delay);
+
                 return;
             }
 
@@ -109,7 +112,7 @@ final class WatchDownloadProgressJob implements ShouldBeUnique, ShouldQueue
 
     public function uniqueId(): string
     {
-        return 'watch-download:' . $this->downloadId;
+        return 'watch-download:'.$this->downloadId;
     }
 
     public function uniqueFor(): int

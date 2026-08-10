@@ -105,7 +105,7 @@ class SeasonDownloadPlannerTest extends TestCase
         $this->assertTrue($plan->release->is($hevc));
         $this->assertCount(2, $plan->items);
 
-        $items = collect($plan->items)->keyBy(fn($item) => $item->episode->id);
+        $items = collect($plan->items)->keyBy(fn ($item) => $item->episode->id);
         $this->assertSame(DownloadReason::UPGRADE, $items[$upgrade->id]->reason);
         $this->assertSame(DownloadReason::MISSING, $items[$missing->id]->reason);
     }
@@ -171,7 +171,7 @@ class SeasonDownloadPlannerTest extends TestCase
         $series = Series::query()->create([
             'title' => 'Test series',
             'thetvdb_id' => random_int(100000, 999999),
-            'thetvdb_slug' => 'test-series-' . uniqid(),
+            'thetvdb_slug' => 'test-series-'.uniqid(),
             'monitored' => true,
         ]);
 
@@ -181,7 +181,7 @@ class SeasonDownloadPlannerTest extends TestCase
         ]);
 
         $season->rssFeed()->create([
-            'rss_url' => 'https://example.com/feed-' . uniqid() . '.xml',
+            'rss_url' => 'https://example.com/feed-'.uniqid().'.xml',
             'enabled' => true,
         ]);
 
@@ -193,7 +193,7 @@ class SeasonDownloadPlannerTest extends TestCase
         return $season->episodes()->create([
             'sonarr_id' => random_int(100000, 999999),
             'episode_number' => $number,
-            'title' => 'Episode ' . $number,
+            'title' => 'Episode '.$number,
             'has_file' => $codec !== null,
             'sonarr_file_id' => $codec !== null ? random_int(100000, 999999) : null,
             'file_codec' => $codec,
@@ -213,8 +213,8 @@ class SeasonDownloadPlannerTest extends TestCase
 
         return $feed->releases()->create([
             'guid' => $guid,
-            'title' => 'Release ' . $guid,
-            'torrent_url' => 'https://example.com/' . $guid . '.torrent',
+            'title' => 'Release '.$guid,
+            'torrent_url' => 'https://example.com/'.$guid.'.torrent',
             'codec' => $codec,
             'quality' => '1080p',
             'first_episode' => $firstEpisode,

@@ -6,13 +6,17 @@ use App\Integrations\BaseApiClient;
 use App\Models\Settings;
 use App\Services\Logging\AniarrLogger;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 class TvdbClient extends BaseApiClient
 {
     protected string $apiKey;
+
     protected ?string $pin = null;
+
     protected ?string $token = null;
+
     protected string $locale = 'eng';
 
     /**
@@ -20,11 +24,11 @@ class TvdbClient extends BaseApiClient
      */
     public function getSeries(int|string $id): array
     {
-        $cacheKey = "thetvdb:getSeries:" . md5($id . ':' . $this->locale);
+        $cacheKey = 'thetvdb:getSeries:'.md5($id.':'.$this->locale);
 
         return Cache::remember($cacheKey, 3600, function () use ($id) {
             try {
-                $response = $this->get('series/' . $id);
+                $response = $this->get('series/'.$id);
                 $translation = $this->get(sprintf('series/%s/translations/%s', $id, $this->locale));
 
                 if ($response->successful() && $translation->successful()) {
@@ -42,6 +46,7 @@ class TvdbClient extends BaseApiClient
                 return [];
             } catch (\Exception $e) {
                 app(AniarrLogger::class)->exception($e);
+
                 return [];
             }
         });
@@ -52,7 +57,7 @@ class TvdbClient extends BaseApiClient
      */
     public function search(string $query, string $type = 'series'): array
     {
-        $cacheKey = "thetvdb:search:" . md5(Str::slug($query) . ':' . $type . ':' . $this->locale);
+        $cacheKey = 'thetvdb:search:'.md5(Str::slug($query).':'.$type.':'.$this->locale);
 
         return Cache::remember($cacheKey, 3600, function () use ($query, $type) {
             try {
@@ -64,12 +69,14 @@ class TvdbClient extends BaseApiClient
 
                 if ($response->successful()) {
                     $data = $response->json();
+
                     return $data['data'] ?? [];
                 }
 
                 return [];
             } catch (\Exception $e) {
                 app(AniarrLogger::class)->exception($e);
+
                 return [];
             }
         });
@@ -78,12 +85,12 @@ class TvdbClient extends BaseApiClient
     /**
      * Получить постер сериала
      */
-    public function getPoster(int $seriesId, string|null $lang = null): ?string
+    public function getPoster(int $seriesId, ?string $lang = null): ?string
     {
         $lang = $lang ?: $this->locale;
         $images = $this->getImages($seriesId, 'poster', $lang);
 
-        if (!empty($images)) {
+        if (! empty($images)) {
             $firstImage = array_first($images['artworks']);
 
             if (isset($firstImage['image'])) {
@@ -114,7 +121,7 @@ class TvdbClient extends BaseApiClient
                 return "https://artworks.thetvdb.com/banners/{$firstImage['id']}";
             }
 
-            if (!empty($images['image'])) {
+            if (! empty($images['image'])) {
                 return $images['image'];
             }
         }
@@ -142,7 +149,7 @@ class TvdbClient extends BaseApiClient
     public function getHeaders(): array
     {
         return [
-            'Authorization' => 'Bearer ' . $this->token
+            'Authorization' => 'Bearer '.$this->token,
         ];
     }
 
@@ -151,7 +158,7 @@ class TvdbClient extends BaseApiClient
      */
     public function login(): bool
     {
-        if (!$this->isConfigured() || empty($this->apiKey)) {
+        if (! $this->isConfigured() || empty($this->apiKey)) {
             return false;
         }
 
@@ -165,8 +172,8 @@ class TvdbClient extends BaseApiClient
                 $data['pin'] = $this->pin;
             }
 
-            $url = rtrim($this->baseUrl, '/') . '/login';
-            $response = \Illuminate\Support\Facades\Http::timeout(10)
+            $url = rtrim($this->baseUrl, '/').'/login';
+            $response = Http::timeout(10)
                 ->withHeaders([
                     'Content-Type' => 'application/json',
                     'Accept' => 'application/json',
@@ -176,12 +183,14 @@ class TvdbClient extends BaseApiClient
             if ($response->successful()) {
                 $data = $response->json();
                 $this->token = $data['data']['token'] ?? null;
-                return !empty($this->token);
+
+                return ! empty($this->token);
             }
 
             return false;
         } catch (\Exception $e) {
             app(AniarrLogger::class)->exception($e);
+
             return false;
         }
     }
@@ -189,10 +198,10 @@ class TvdbClient extends BaseApiClient
     /**
      * Получить изображения сериала
      */
-    protected function getImages(int $seriesId, string|null $type = null, string|null $lang = null): array
+    protected function getImages(int $seriesId, ?string $type = null, ?string $lang = null): array
     {
         $lang = $lang ?? $this->locale;
-        $cacheKey = "thetvdb:images:" . md5($seriesId . ':' . ($type ?? 'all') . ':' . $lang);
+        $cacheKey = 'thetvdb:images:'.md5($seriesId.':'.($type ?? 'all').':'.$lang);
 
         return Cache::remember($cacheKey, 3600, function () use ($seriesId, $type, $lang) {
             try {
@@ -210,6 +219,7 @@ class TvdbClient extends BaseApiClient
                 return [];
             } catch (\Exception $e) {
                 app(AniarrLogger::class)->exception($e);
+
                 return [];
             }
         });
