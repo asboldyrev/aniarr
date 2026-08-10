@@ -12,7 +12,7 @@ class SeriesUpdatedTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_builds_payload_from_seasons_without_legacy_rss_relation(): void
+    public function test_it_builds_new_domain_payload(): void
     {
         $series = Series::query()->create([
             'title' => 'Test Series',
@@ -49,12 +49,13 @@ class SeriesUpdatedTest extends TestCase
 
         $this->assertSame($series->id, $payload['id']);
         $this->assertSame(42, $payload['sonarrId']);
-        $this->assertTrue($payload['sonarrConnected']);
-        $this->assertTrue($payload['hasHevc']);
-        $this->assertFalse($payload['hasAvc']);
-        $this->assertCount(1, $payload['rssFeeds']);
-        $this->assertSame(1, $payload['rssFeeds'][0]['seasonNumber']);
+        $this->assertArrayNotHasKey('status', $payload);
+        $this->assertArrayNotHasKey('rssFeeds', $payload);
         $this->assertCount(1, $payload['seasons']);
         $this->assertSame(1, $payload['seasons'][0]['number']);
+        $this->assertSame(1, $payload['seasons'][0]['episodesCount']);
+        $this->assertSame(1, $payload['seasons'][0]['filesCount']);
+        $this->assertSame('https://example.test/feed.xml', $payload['seasons'][0]['rssFeed']['rssUrl']);
+        $this->assertSame('hevc', $payload['seasons'][0]['episodes'][0]['fileCodec']);
     }
 }
