@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\SyncRssFeedAction;
+use App\Events\RssFeedUpdated;
 use App\Models\RssFeed;
 use App\Services\Logging\AniarrLogger;
 use App\Services\Rss\RssParser;
@@ -11,6 +12,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use RuntimeException;
 use Throwable;
 
 final class SyncRssFeedJob implements ShouldQueue
@@ -43,10 +45,17 @@ final class SyncRssFeedJob implements ShouldQueue
             $items = $parser->parseFeed($rssFeed->rss_url);
 
             if ($items->items === []) {
-                throw new \RuntimeException('RSS feed does not contain supported releases.');
+                throw new RuntimeException('RSS feed does not contain supported releases.');
             }
 
             $changed = $syncAction->execute($rssFeed, $items);
+
+            if ($changed) {
+                event(new RssFeedUpdated(
+                    rssFeedId: $rssFeed->id,
+                    seasonId: $rssFeed->season_id,
+                ));
+            }
 
             $logger->info(
                 $changed ? '[RSS] Лента обновлена' : '[RSS] Лента не изменилась',
