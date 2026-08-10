@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\LogType;
 use App\Integrations\JellyfinClient;
 use App\Models\Download;
 use App\Services\Logging\AniarrLogger;
@@ -18,40 +19,34 @@ final class RefreshJellyfinLibraryJob implements ShouldQueue
 
     public int $tries = 3;
 
-    public function __construct(
-        public int $downloadId,
-    ) {}
+    public function __construct(public int $downloadId) {}
 
     public function handle(JellyfinClient $jellyfinClient): void
     {
-        /** @var Download|null $download */
-        $download = Download::query()
-            ->with('season.series')
-            ->find($this->downloadId);
-
+        $download = Download::query()->with('season.series')->find($this->downloadId);
         if ($download === null) {
             return;
         }
 
-        $logger = app(AniarrLogger::class);
-        $logger->setSeries($download->season->series_id);
+        $logger = app(AniarrLogger::class)->forDownload($download)->withSource('jellyfin');
 
-        try {
-            if (! $jellyfinClient->testConnection()) {
-                $logger->warning('[Jellyfin] Обновление библиотеки пропущено: сервис недоступен');
-
-                return;
-            }
-
-            if (! $jellyfinClient->refreshLibrary()) {
-                throw new RuntimeException('Jellyfin не принял запрос на обновление библиотеки.');
-            }
-
-            $logger->info('[Jellyfin] Обновление библиотеки запущено', [
-                'download_id' => $download->id,
-            ]);
-        } finally {
-            $logger->resetSeries();
+        if (! $jellyfinClient->testConnection()) {
+            $logger->event(
+                'jellyfin.unavailable',
+                '[Jellyfin] Обновление библиотеки пропущено: сервис недоступен',
+                LogType::WARNING,
+            );
+            return;
         }
+
+        if (! $jellyfinClient->refreshLibrary()) {
+            throw new RuntimeException('Jellyfin не принял запрос на обновление библиотеки.');
+        }
+
+        $logger->event(
+            'jellyfin.refresh_requested',
+            '[Jellyfin] Обновление библиотеки запущено',
+            LogType::INFO,
+        );
     }
 }
