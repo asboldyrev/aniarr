@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\SyncSeriesStateFromSonarrAction;
 use App\Enums\DownloadStatus;
+use App\Enums\LogType;
 use App\Integrations\QBittorrent\Dto\Torrent as QBitTorrent;
 use App\Integrations\QBittorrent\QBittorrentClient;
 use App\Integrations\Sonarr\Dto\importFile;
@@ -23,33 +24,24 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     private const SONARR_COMMAND_TIMEOUT = 300;
-
     private const POLL_INTERVAL = 3;
 
     public int $tries = 5;
-
     public $timeout = 360;
 
-    public function __construct(
-        public int $downloadId,
-    ) {}
+    public function __construct(public int $downloadId) {}
 
     public function handle(
         SonarrClient $sonarrClient,
         QBittorrentClient $qBittorrentClient,
         SyncSeriesStateFromSonarrAction $syncAction,
     ): void {
-        /** @var Download|null $download */
-        $download = Download::query()
-            ->with(['season.series', 'release', 'items.episode'])
-            ->find($this->downloadId);
-
+        $download = Download::query()->with(['season.series', 'release', 'items.episode'])->find($this->downloadId);
         if ($download === null || $download->status !== DownloadStatus::IMPORTING) {
             return;
         }
 
-        $logger = app(AniarrLogger::class);
-        $logger->setSeries($download->season->series_id);
+        $logger = app(AniarrLogger::class)->forDownload($download)->withSource('sonarr');
 
         try {
             if (! $sonarrClient->testConnection()) {
@@ -66,6 +58,10 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
                 if ($commandFiles === []) {
                     throw new RuntimeException('Нет файлов для ManualImport в Sonarr.');
                 }
+
+                $logger->event('download.importing', '[Sonarr] Импорт Download запущен', LogType::INFO, [
+                    'files_count' => count($commandFiles),
+                ]);
 
                 $command = $sonarrClient->sendManualImportCommand($commandFiles, 'move');
                 $commandId = (int) ($command['id'] ?? 0);
@@ -96,15 +92,11 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
             $download->load(['release', 'items.episode']);
             foreach ($download->items as $item) {
                 if (! $item->episode->has_file) {
-                    throw new RuntimeException(
-                        'Sonarr не подтвердил файл эпизода '.$item->episode->episode_number.'.',
-                    );
+                    throw new RuntimeException('Sonarr не подтвердил файл эпизода '.$item->episode->episode_number.'.');
                 }
 
                 if ($item->episode->file_codec !== $download->release->codec) {
-                    throw new RuntimeException(
-                        'Codec эпизода '.$item->episode->episode_number.' не соответствует импортированному Release.',
-                    );
+                    throw new RuntimeException('Codec эпизода '.$item->episode->episode_number.' не соответствует импортированному Release.');
                 }
             }
 
@@ -114,8 +106,7 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
                 'error_message' => null,
             ]);
 
-            $logger->info('[Sonarr] Download успешно импортирован', [
-                'download_id' => $download->id,
+            $logger->event('download.completed', '[Sonarr] Download успешно импортирован', LogType::INFO, [
                 'release_id' => $download->release_id,
             ]);
 
@@ -123,17 +114,13 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
             RefreshJellyfinLibraryJob::dispatch($download->id)->onQueue('downloads');
             PlanSeasonDownloadsJob::dispatch($download->season_id)->onQueue('downloads');
         } catch (Throwable $e) {
-            $logger->exception($e);
+            $logger->exception($e, event: 'download.import_failed');
             throw $e;
-        } finally {
-            $logger->resetSeries();
         }
     }
 
-    private function findCurrentTorrent(
-        Download $download,
-        QBittorrentClient $qBittorrentClient,
-    ): ?QBitTorrent {
+    private function findCurrentTorrent(Download $download, QBittorrentClient $qBittorrentClient): ?QBitTorrent
+    {
         if (! $qBittorrentClient->login()) {
             return null;
         }
@@ -197,10 +184,22 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
 
     public function failed(?Throwable $e): void
     {
-        Download::query()->whereKey($this->downloadId)->update([
+        $download = Download::query()->with('season')->find($this->downloadId);
+        if ($download === null) {
+            return;
+        }
+
+        $download->update([
             'status' => DownloadStatus::FAILED,
             'failed_at' => now(),
             'error_message' => $e?->getMessage(),
         ]);
+
+        app(AniarrLogger::class)
+            ->forDownload($download)
+            ->withSource('sonarr')
+            ->event('download.failed', '[Sonarr] Download завершился ошибкой', LogType::ERROR, [
+                'error' => $e?->getMessage(),
+            ]);
     }
 }
