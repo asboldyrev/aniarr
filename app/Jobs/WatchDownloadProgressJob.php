@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\DownloadStatus;
+use App\Enums\LogType;
 use App\Integrations\QBittorrent\Dto\Torrent as QBitTorrent;
 use App\Integrations\QBittorrent\QBittorrentClient;
 use App\Models\Download;
@@ -23,49 +24,36 @@ final class WatchDownloadProgressJob implements ShouldBeUnique, ShouldQueue
 
     public $timeout = 0;
 
-    public function __construct(
-        public int $downloadId,
-    ) {}
+    public function __construct(public int $downloadId) {}
 
     public function handle(QBittorrentClient $qBittorrentClient): void
     {
-        /** @var Download|null $download */
-        $download = Download::query()
-            ->with('season.series')
-            ->find($this->downloadId);
-
+        $download = Download::query()->with('season.series')->find($this->downloadId);
         if ($download === null || $download->status !== DownloadStatus::DOWNLOADING || ! $download->qbit_hash) {
             return;
         }
 
-        $logger = app(AniarrLogger::class);
-        $logger->setSeries($download->season->series_id);
+        $logger = app(AniarrLogger::class)->forDownload($download)->withSource('qbittorrent');
 
         try {
             if (! $qBittorrentClient->login()) {
                 $this->release(5);
-
                 return;
             }
 
             $current = $this->findCurrentTorrent($download, $qBittorrentClient);
             if ($current === null) {
-                $logger->warning('[QBittorrent] Download не найден по hash/tag', [
-                    'download_id' => $download->id,
+                $logger->event('download.torrent_missing', '[QBittorrent] Download не найден по hash/tag', LogType::WARNING, [
                     'hash' => $download->qbit_hash,
                 ]);
                 $this->release(5);
-
                 return;
             }
 
             $progress = (int) round(max(0, min(1, (float) $current->progress)) * 100);
             $eta = max(0, min(16_777_215, (int) $current->eta));
 
-            $download->update([
-                'progress' => $progress,
-                'eta_seconds' => $eta,
-            ]);
+            $download->update(['progress' => $progress, 'eta_seconds' => $eta]);
 
             $isDone = $progress >= 100 || in_array(
                 $current->state,
@@ -76,7 +64,6 @@ final class WatchDownloadProgressJob implements ShouldBeUnique, ShouldQueue
             if (! $isDone) {
                 $delay = (int) max(1, min(15, ceil(max(1, $eta) / 7200)));
                 $this->release($delay);
-
                 return;
             }
 
@@ -86,27 +73,23 @@ final class WatchDownloadProgressJob implements ShouldBeUnique, ShouldQueue
                 'eta_seconds' => 0,
             ]);
 
+            $logger->event('download.downloaded', '[QBittorrent] Загрузка завершена', LogType::INFO);
+
             ImportDownloadToSonarrJob::dispatch($download->id)->onQueue('downloads');
         } catch (Throwable $e) {
-            $logger->exception($e);
+            $logger->exception($e, event: 'download.watch_failed');
             throw $e;
-        } finally {
-            $logger->resetSeries();
         }
     }
 
-    private function findCurrentTorrent(
-        Download $download,
-        QBittorrentClient $qBittorrentClient,
-    ): ?QBitTorrent {
+    private function findCurrentTorrent(Download $download, QBittorrentClient $qBittorrentClient): ?QBitTorrent
+    {
         $torrents = $qBittorrentClient->getTorrentsByTag($download->qbit_tag ?? '');
-
         foreach ($torrents as $torrent) {
             if ($torrent->hash === $download->qbit_hash) {
                 return $torrent;
             }
         }
-
         return null;
     }
 
