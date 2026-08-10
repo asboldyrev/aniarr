@@ -6,27 +6,22 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('rss_feeds', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('series_id')->constrained('series')->cascadeOnDelete();
-            $table->integer('season_number')->nullable();
+            $table->foreignId('season_id')->unique()->constrained('seasons')->cascadeOnDelete();
             $table->string('rss_url', 500);
-            $table->string('last_rss_hash')->nullable();
+            $table->boolean('enabled')->default(true)->index();
+            $table->string('last_rss_hash', 64)->nullable();
             $table->timestamp('last_rss_check')->nullable();
+            $table->timestamp('last_rss_success_at')->nullable();
+            $table->timestamp('last_error_at')->nullable();
+            $table->text('last_error')->nullable();
             $table->timestamps();
-
-            $table->index('series_id');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('rss_feeds');
