@@ -6,24 +6,27 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('activity_logs', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('series_id')->constrained('series');
-            $table->string('message');
-            $table->enum('type', ['info', 'warning', 'error'])->default('info');
+            $table->foreignId('series_id')->nullable()->constrained('series')->nullOnDelete();
+            $table->foreignId('season_id')->nullable()->constrained('seasons')->nullOnDelete();
+            $table->foreignId('download_id')->nullable()->constrained('downloads')->nullOnDelete();
+            $table->string('source')->nullable()->index();
+            $table->string('event')->nullable()->index();
+            $table->enum('type', ['debug', 'info', 'warning', 'error'])->default('info')->index();
+            $table->text('message');
             $table->json('context')->nullable();
+            $table->timestamp('resolved_at')->nullable();
             $table->timestamps();
+
+            $table->index(['series_id', 'created_at']);
+            $table->index(['season_id', 'created_at']);
+            $table->index(['download_id', 'created_at']);
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('activity_logs');
