@@ -42,7 +42,16 @@ final class CleanupQBitTorrentJob implements ShouldQueue
             }
 
             $hash = $download->qbit_hash;
-            if (! $qBittorrentClient->deleteTorrent($hash)) {
+            $exists = false;
+
+            foreach ($qBittorrentClient->getTorrentsByTag($download->qbit_tag ?? '') as $torrent) {
+                if ($torrent->hash === $hash) {
+                    $exists = true;
+                    break;
+                }
+            }
+
+            if ($exists && ! $qBittorrentClient->deleteTorrent($hash)) {
                 throw new RuntimeException('Не удалось удалить torrent из qBittorrent.');
             }
 
@@ -55,9 +64,10 @@ final class CleanupQBitTorrentJob implements ShouldQueue
                 'eta_seconds' => 0,
             ]);
 
-            $logger->info('[QBittorrent] Torrent удалён после импорта', [
+            $logger->info('[QBittorrent] Очистка Download завершена', [
                 'download_id' => $download->id,
                 'hash' => $hash,
+                'torrent_existed' => $exists,
             ]);
         } finally {
             $logger->resetSeries();
