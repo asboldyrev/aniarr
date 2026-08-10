@@ -2,10 +2,13 @@
 
 namespace App\Jobs;
 
+use App\Actions\Downloads\CompleteImportedDownloadAction;
 use App\Actions\SyncSeriesStateFromSonarrAction;
+use App\Enums\DownloadStatus;
 use App\Enums\LogType;
 use App\Events\SeriesUpdated;
 use App\Integrations\Sonarr\SonarrClient;
+use App\Models\Download;
 use App\Models\Series;
 use App\Services\Logging\AniarrLogger;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -29,6 +32,7 @@ final class SyncSeriesWithSonarrJob implements ShouldQueue
     public function handle(
         SonarrClient $sonarrClient,
         SyncSeriesStateFromSonarrAction $syncAction,
+        CompleteImportedDownloadAction $completeImportedDownload,
     ): void {
         /** @var Series|null $series */
         $series = Series::find($this->seriesId);
@@ -66,6 +70,8 @@ final class SyncSeriesWithSonarrJob implements ShouldQueue
 
             $syncAction->execute($series, $seriesInSonarr, $sonarrClient);
 
+            $this->completePendingImports($series, $completeImportedDownload);
+
             $logger->event(
                 'sonarr.synced',
                 '[Sonarr] Синхронизация с Sonarr прошла успешно',
@@ -84,5 +90,16 @@ final class SyncSeriesWithSonarrJob implements ShouldQueue
 
             throw $e;
         }
+    }
+
+    private function completePendingImports(
+        Series $series,
+        CompleteImportedDownloadAction $completeImportedDownload,
+    ): void {
+        Download::query()
+            ->whereHas('season', fn ($query) => $query->where('series_id', $series->id))
+            ->where('status', DownloadStatus::IMPORTING->value)
+            ->whereNotNull('imported_at')
+            ->each(fn (Download $download) => $completeImportedDownload->execute($download));
     }
 }
