@@ -8,7 +8,6 @@ use App\Http\Resources\ActivityLogResource;
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Http\Response;
 
 final class ActivityLogController extends Controller
 {
