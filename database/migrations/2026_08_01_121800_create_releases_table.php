@@ -22,10 +22,12 @@ return new class extends Migration
             $table->unsignedSmallInteger('last_episode');
             $table->unsignedBigInteger('size_bytes')->nullable();
             $table->timestamp('published_at')->nullable();
+            $table->boolean('is_current')->default(true)->index();
+            $table->timestamp('last_seen_at')->nullable();
             $table->timestamps();
 
             $table->unique(['rss_feed_id', 'guid']);
-            $table->index(['rss_feed_id', 'codec', 'last_episode']);
+            $table->index(['rss_feed_id', 'is_current', 'codec', 'last_episode']);
         });
     }
 
