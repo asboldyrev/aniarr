@@ -16,6 +16,7 @@ final class FeedFingerprint
         $normalized = array_map(
             fn(FeedItem $item): array => [
                 'guid' => $item->guid,
+                'title' => $item->title,
                 'torrent_id' => $item->torrentId,
                 'release_id' => $item->releaseId,
                 'torrent_url' => $item->torrentUrl,
