@@ -12,69 +12,54 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
- * @property string $title
- * @property int $series_id
+ * @property int $season_id
  * @property int|null $sonarr_id
- * @property int|null $torrent_id
- * @property int $season_number
+ * @property int|null $sonarr_file_id
  * @property int $episode_number
- * @property string $codec
- * @property Carbon|null $downloaded_at
+ * @property string $title
+ * @property bool $has_file
+ * @property Codec|null $file_codec
+ * @property Carbon|null $file_date_added
  * @property Carbon $created_at
  * @property Carbon $updated_at
- * @property-read Series $series
- * @property-read Collection<int, EpisodeDownload> $episodeDownloads
+ * @property-read Season $season
+ * @property-read Collection<int, DownloadItem> $downloadItems
  */
 class Episode extends Model
 {
     use HasFactory;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
-        'title',
-        'series_id',
+        'season_id',
         'sonarr_id',
-        'torrent_id',
-        'season_number',
+        'sonarr_file_id',
         'episode_number',
-        'codec',
-        'downloaded_at',
+        'title',
+        'has_file',
+        'file_codec',
+        'file_date_added',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
+            'season_id' => 'integer',
             'sonarr_id' => 'integer',
-            'torrent_id' => 'integer',
-            'season_number' => 'integer',
+            'sonarr_file_id' => 'integer',
             'episode_number' => 'integer',
-            'downloaded_at' => 'datetime',
-            'codec' => Codec::class,
+            'has_file' => 'boolean',
+            'file_codec' => Codec::class,
+            'file_date_added' => 'datetime',
         ];
     }
 
-    /**
-     * Get the series that owns the episode.
-     */
-    public function series(): BelongsTo
+    public function season(): BelongsTo
     {
-        return $this->belongsTo(Series::class);
+        return $this->belongsTo(Season::class);
     }
 
-    /**
-     * Get the torrent that downloaded this episode.
-     */
-    public function torrent(): BelongsTo
+    public function downloadItems(): HasMany
     {
-        return $this->belongsTo(Torrent::class);
+        return $this->hasMany(DownloadItem::class);
     }
 }
