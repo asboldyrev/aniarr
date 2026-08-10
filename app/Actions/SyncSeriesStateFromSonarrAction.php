@@ -33,7 +33,7 @@ final class SyncSeriesStateFromSonarrAction
 
             /** @var SonarrEpisode $sonarrEpisode */
             foreach ($sonarrEpisodes as $sonarrEpisode) {
-                if ($sonarrEpisode->id <= 0 || $sonarrEpisode->episodeNumber <= 0) {
+                if ($sonarrEpisode->id <= 0) {
                     continue;
                 }
 
@@ -45,9 +45,9 @@ final class SyncSeriesStateFromSonarrAction
                 $hasFile = $sonarrEpisode->hasFile && $sonarrEpisode->episodeFileId > 0;
 
                 $season->episodes()->updateOrCreate(
-                    ['sonarr_id' => $sonarrEpisode->id],
+                    ['episode_number' => $sonarrEpisode->episodeNumber],
                     [
-                        'episode_number' => $sonarrEpisode->episodeNumber,
+                        'sonarr_id' => $sonarrEpisode->id,
                         'title' => $sonarrEpisode->title,
                         'has_file' => $hasFile,
                         'sonarr_file_id' => $hasFile ? $sonarrEpisode->episodeFileId : null,
