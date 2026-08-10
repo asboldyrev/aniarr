@@ -2,18 +2,21 @@
 
 namespace App\Services\Rss\Dto;
 
-class FeedItem
+final readonly class FeedItem
 {
+    /**
+     * @param  array<int>  $episodes
+     */
     public function __construct(
-        readonly string $title,
-        readonly string $guid,
-        readonly string $torrentUrl,
-        readonly int $torrentId,
-        readonly int $release_id,
-        readonly string $pubDate,
-        readonly int $size,
-        readonly string $codec,
-        readonly array $episodes,
-        readonly string $quality,
+        public string $title,
+        public string $guid,
+        public string $torrentUrl,
+        public ?int $torrentId,
+        public ?int $releaseId,
+        public string $pubDate,
+        public int $size,
+        public string $codec,
+        public array $episodes,
+        public string $quality,
     ) {}
 }
