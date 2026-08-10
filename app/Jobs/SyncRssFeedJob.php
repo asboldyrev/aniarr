@@ -55,6 +55,9 @@ final class SyncRssFeedJob implements ShouldQueue
                     rssFeedId: $rssFeed->id,
                     seasonId: $rssFeed->season_id,
                 ));
+
+                PlanSeasonDownloadsJob::dispatch($rssFeed->season_id)
+                    ->onQueue('downloads');
             }
 
             $logger->info(
@@ -74,6 +77,8 @@ final class SyncRssFeedJob implements ShouldQueue
             $logger->exception($e, $rssFeed->rss_url);
 
             throw $e;
+        } finally {
+            $logger->resetSeries();
         }
     }
 }
