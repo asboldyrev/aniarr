@@ -24,9 +24,11 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     private const SONARR_COMMAND_TIMEOUT = 300;
+
     private const POLL_INTERVAL = 3;
 
     public int $tries = 5;
+
     public $timeout = 360;
 
     public function __construct(public int $downloadId) {}

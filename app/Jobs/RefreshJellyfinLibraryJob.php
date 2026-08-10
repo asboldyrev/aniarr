@@ -36,6 +36,7 @@ final class RefreshJellyfinLibraryJob implements ShouldQueue
                 '[Jellyfin] Обновление библиотеки пропущено: сервис недоступен',
                 LogType::WARNING,
             );
+
             return;
         }
 

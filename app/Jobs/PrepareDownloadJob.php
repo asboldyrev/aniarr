@@ -2,8 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Enums\LogType;
 use App\Enums\DownloadStatus;
+use App\Enums\LogType;
 use App\Integrations\QBittorrent\Dto\File;
 use App\Integrations\QBittorrent\Dto\Torrent as QBitTorrent;
 use App\Integrations\QBittorrent\QBittorrentClient;
@@ -148,6 +148,7 @@ final class PrepareDownloadJob implements ShouldQueue
             }
             sleep(1);
         }
+
         return [];
     }
 
