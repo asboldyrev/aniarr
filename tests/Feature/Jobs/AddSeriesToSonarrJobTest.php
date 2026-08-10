@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Jobs;
 
+use App\Integrations\Sonarr\Dto\RootFolder;
 use App\Integrations\Sonarr\Dto\SonarrSeries;
 use App\Integrations\Sonarr\SonarrClient;
 use App\Jobs\AddSeriesToSonarrJob;
@@ -32,7 +33,13 @@ class AddSeriesToSonarrJobTest extends TestCase
         $client->shouldReceive('getSeriesByTvdbId')->once()->with(411893)->andReturnNull();
         $client->shouldReceive('findByTvdbId')->once()->with(411893)->andReturn($lookup);
         $client->shouldReceive('getRootFolders')->once()->andReturn([
-            (object) ['path' => '/media/series'],
+            RootFolder::makeFromResponse([
+                'id' => 1,
+                'path' => '/media/series',
+                'accessible' => true,
+                'freeSpace' => 1_000_000,
+                'unmappedFolders' => [],
+            ]),
         ]);
         $client->shouldReceive('getQualityProfiles')->once()->andReturn([
             ['id' => 1, 'name' => 'HD'],
