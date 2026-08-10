@@ -3,36 +3,65 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\AddSeriesAction;
-use App\Enums\Status;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreSeriesRequest;
 use App\Http\Resources\SeriesResource;
 use App\Models\Series;
-use App\Services\Logging\AniarrLogger;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
-class SeriesController extends Controller
+final class SeriesController extends Controller
 {
+    public function index(): AnonymousResourceCollection
+    {
+        $series = Series::query()
+            ->with([
+                'seasons.rssFeed',
+                'seasons.episodes',
+                'seasons.downloads.release',
+            ])
+            ->orderBy('title')
+            ->get();
+
+        return SeriesResource::collection($series);
+    }
+
+    public function show(Series $series): SeriesResource
+    {
+        $series->load([
+            'seasons.rssFeed.releases',
+            'seasons.episodes',
+            'seasons.downloads.release',
+            'seasons.downloads.items.episode',
+        ]);
+
+        return new SeriesResource($series);
+    }
+
     /**
-     * Добавить новый сериал
+     * Добавить новый сериал.
      */
     public function store(StoreSeriesRequest $request, AddSeriesAction $addSeries): JsonResponse
     {
-        $series = Series::create([
-            'title' => $request->title,
-            'thetvdb_id' => $request->thetvdb_id,
-            'thetvdb_slug' => $request->thetvdb_slug,
-            'poster_url' => null,
-            'poster_path' => null,
-            'year' => $request->year,
-            'status' => Status::WAITING,
-            'last_updated' => now(),
+        $series = Series::query()->firstOrCreate([
+            'thetvdb_id' => $request->integer('thetvdb_id'),
+        ], [
+            'title' => $request->string('title')->toString(),
+            'thetvdb_slug' => $request->string('thetvdb_slug')->toString(),
+            'poster_url' => $request->input('poster_url'),
+            'year' => $request->integer('year') ?: null,
+            'monitored' => true,
         ]);
 
-        app(AniarrLogger::class)->setSeries($series->id);
+        $addSeries->execute(
+            $request->integer('thetvdb_id'),
+            $request->input('rss_feeds', []),
+            $series,
+        );
 
-        $addSeries->execute($request->thetvdb_id, $request->rss_feeds, $series);
-
-        return response()->json(new SeriesResource($series), 201);
+        return response()->json(
+            new SeriesResource($series->fresh()),
+            $series->wasRecentlyCreated ? 201 : 200,
+        );
     }
 }
