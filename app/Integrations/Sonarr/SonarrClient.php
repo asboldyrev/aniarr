@@ -9,6 +9,7 @@ use App\Integrations\Sonarr\Dto\SonarrEpisode;
 use App\Integrations\Sonarr\Dto\SonarrSeries;
 use App\Models\Settings;
 use App\Services\Logging\AniarrLogger;
+use RuntimeException;
 
 /**
  * Клиент API Sonarr для управления сериалами и эпизодами.
@@ -139,13 +140,21 @@ class SonarrClient extends BaseApiClient
     public function getEpisodes(int $seriesId): array
     {
         $response = $this->get('episode', ['seriesId' => $seriesId, 'includeEpisodeFile' => 'true']);
-        $episodes = $response->successful() ? $response->json() : null;
 
-        if (is_array($episodes)) {
-            return array_map(fn($episode) => SonarrEpisode::makeFromResponse($episode), $episodes);
+        if (! $response->successful()) {
+            throw new RuntimeException(sprintf(
+                'Sonarr вернул ошибку при получении эпизодов сериала %d: HTTP %d',
+                $seriesId,
+                $response->status(),
+            ));
         }
 
-        return [];
+        $episodes = $response->json();
+        if (! is_array($episodes)) {
+            throw new RuntimeException('Sonarr вернул некорректный ответ со списком эпизодов');
+        }
+
+        return array_map(fn($episode) => SonarrEpisode::makeFromResponse($episode), $episodes);
     }
 
     /**
