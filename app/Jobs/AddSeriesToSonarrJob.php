@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Integrations\Sonarr\Dto\RootFolder;
 use App\Integrations\Sonarr\Dto\SonarrSeries;
 use App\Integrations\Sonarr\SonarrClient;
 use App\Models\Series;
@@ -16,84 +15,70 @@ use Illuminate\Queue\SerializesModels;
 /**
  * Задача для добавления сериала в Sonarr.
  */
-class AddSeriesToSonarrJob implements ShouldQueue
+final class AddSeriesToSonarrJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * Create a new job instance.
-     */
     public function __construct(
-        public int $seriesId
+        public int $seriesId,
     ) {}
 
-    /**
-     * Execute the job.
-     */
     public function handle(SonarrClient $sonarrClient): void
     {
-        /** @var Series $series */
+        /** @var Series|null $series */
         $series = Series::find($this->seriesId);
-        if (! $series || ! $series->thetvdb_id) {
+        if ($series === null || ! $series->thetvdb_id) {
             return;
         }
 
-        if (! $sonarrClient->testConnection() || ! $series->thetvdb_id) {
-            $series->update(['sonarr_id' => null, 'last_updated' => now()]);
+        $logger = app(AniarrLogger::class);
+        $logger->setSeries($series->id);
 
-            return;
+        try {
+            if (! $sonarrClient->testConnection()) {
+                $logger->warning('[Sonarr] Добавление сериала пропущено: Sonarr недоступен');
+
+                return;
+            }
+
+            $seriesInSonarr = $this->addSeriesToSonarr($sonarrClient, $series);
+            if ($seriesInSonarr === null) {
+                return;
+            }
+
+            $series->update(['sonarr_id' => $seriesInSonarr->id]);
+
+            $logger->info('[Sonarr] Сериал добавлен в Sonarr');
+        } finally {
+            $logger->resetSeries();
         }
-
-        $seriesInSonarr = $this->addSeriesToSonarr($sonarrClient, $series);
-        if ($seriesInSonarr === null) {
-            $series->update(['sonarr_id' => null, 'last_updated' => now()]);
-
-            return;
-        }
-
-        $series->update(['sonarr_id' => $seriesInSonarr->id, 'last_updated' => now()]);
-
-        app(AniarrLogger::class)->info('[Sonarr] Сериал добавлен в Sonarr');
     }
 
-    /**
-     * Добавляет сериал в Sonarr.
-     *
-     * @param  SonarrClient  $sonarrClient  Экземпляр клиента Sonarr
-     * @param  Series  $series  Модель сериала
-     * @return SonarrSeries|null Данные добавленного сериала или null при ошибке
-     */
     private function addSeriesToSonarr(SonarrClient $sonarrClient, Series $series): ?SonarrSeries
     {
-        $thetvdbId = $series->thetvdb_id;
-        $lookup = $sonarrClient->findByTvdbId($thetvdbId);
-        if (! $lookup) {
-            app(AniarrLogger::class)->warning('[Sonarr] Сериал не найден в Sonarr');
+        $lookup = $sonarrClient->findByTvdbId($series->thetvdb_id);
+        if ($lookup === null) {
+            app(AniarrLogger::class)->warning('[Sonarr] Сериал не найден через lookup');
 
             return null;
         }
 
         $rootFolders = $sonarrClient->getRootFolders();
-        $rootPath = array_find($rootFolders, fn($folder) => !empty($folder))?->path ?? null;
+        $rootPath = array_find($rootFolders, fn($folder) => ! empty($folder))?->path ?? null;
         if ($rootPath === null) {
-            app(AniarrLogger::class)->warning('[Sonarr] Не найдены корневые директории в Sonarr');
+            app(AniarrLogger::class)->warning('[Sonarr] Не найдены корневые директории Sonarr');
 
             return null;
         }
 
         $qualityProfiles = $sonarrClient->getQualityProfiles();
-        $qualityProfileId = array_find($qualityProfiles, fn($profile) => !empty($profile['id']))['id'] ?? null;
+        $qualityProfileId = array_find($qualityProfiles, fn($profile) => ! empty($profile['id']))['id'] ?? null;
         if ($qualityProfileId === null) {
-            app(AniarrLogger::class)->warning('[Sonarr] Не найдены профили качества в Sonarr');
+            app(AniarrLogger::class)->warning('[Sonarr] Не найдены профили качества Sonarr');
 
             return null;
         }
 
-        $added = $sonarrClient->addSeriesFromLookup($lookup, $rootPath, $qualityProfileId);
-        if (!empty($added)) {
-            return $added;
-        }
-
-        return null;
+        return $sonarrClient->addSeriesFromLookup($lookup, $rootPath, $qualityProfileId);
     }
 }
