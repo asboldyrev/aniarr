@@ -2,72 +2,101 @@
 
 namespace App\Actions;
 
+use App\Enums\Codec;
 use App\Integrations\Sonarr\Dto\EpisodeFile;
 use App\Integrations\Sonarr\Dto\SonarrEpisode;
 use App\Integrations\Sonarr\Dto\SonarrSeries;
 use App\Integrations\Sonarr\SonarrClient;
-use App\Models\Episode;
+use App\Models\Season;
 use App\Models\Series;
+use Illuminate\Support\Facades\DB;
 
 /**
- * Синхронизирует состояние сериала (эпизоды, кодеки, статус загрузки) из Sonarr.
+ * Синхронизирует фактическое состояние сезонов и эпизодов сериала из Sonarr.
  */
-class SyncSeriesStateFromSonarrAction
+final class SyncSeriesStateFromSonarrAction
 {
-    /**
-     * Синхронизирует эпизоды и метаданные сериала из Sonarr.
-     *
-     * @param  Series  $series  Модель сериала для обновления
-     * @param  SonarrSeries  $sonarrSeries  Сырые данные сериала из Sonarr
-     * @param  SonarrClient  $sonarrService  Экземпляр клиента Sonarr
-     */
-    public function execute(Series $series, SonarrSeries $sonarrSeries, SonarrClient $sonarrService): void
+    public function execute(Series $series, SonarrSeries $sonarrSeries, SonarrClient $sonarrClient): void
     {
-        $sonarrId = (int) ($sonarrSeries->id ?? 0);
-        if ($sonarrId === 0) {
+        if ($sonarrSeries->id <= 0) {
             return;
         }
 
-        $sonarrEpisodes = $sonarrService->getEpisodes($sonarrId);
-        if (empty($sonarrEpisodes)) {
-            return;
-        }
+        $sonarrEpisodes = $sonarrClient->getEpisodes($sonarrSeries->id);
 
-        /** @var SonarrEpisode $sonarrEpisode */
-        foreach ($sonarrEpisodes as $sonarrEpisode) {
-            /** @var Episode $episode */
-            $episode = $series->episodes()->firstOrNew([
-                'sonarr_id' => $sonarrEpisode->id,
-            ], [
-                'title' => $sonarrEpisode->title,
-                'sonarr_id' => $sonarrEpisode->id,
-                'season_number' => $sonarrEpisode->seasonNumber,
-                'episode_number' => $sonarrEpisode->episodeNumber,
+        DB::transaction(function () use ($series, $sonarrSeries, $sonarrEpisodes): void {
+            $series->update([
+                'sonarr_id' => $sonarrSeries->id,
             ]);
 
-            if ($sonarrEpisode->hasFile) {
-                $episode->codec = $this->getEpisodeFileCodec($sonarrEpisode->episodeFile);
-                $episode->downloaded_at = $sonarrEpisode->episodeFile->dateAdded;
-            } else {
-                $episode->codec = 'hevc';
-                $episode->downloaded_at = null;
+            $seasons = $this->syncSeasons($series, $sonarrSeries, $sonarrEpisodes);
+
+            /** @var SonarrEpisode $sonarrEpisode */
+            foreach ($sonarrEpisodes as $sonarrEpisode) {
+                if ($sonarrEpisode->id <= 0 || $sonarrEpisode->episodeNumber <= 0) {
+                    continue;
+                }
+
+                $season = $seasons[$sonarrEpisode->seasonNumber] ?? null;
+                if ($season === null) {
+                    continue;
+                }
+
+                $hasFile = $sonarrEpisode->hasFile && $sonarrEpisode->episodeFileId > 0;
+
+                $season->episodes()->updateOrCreate(
+                    ['sonarr_id' => $sonarrEpisode->id],
+                    [
+                        'episode_number' => $sonarrEpisode->episodeNumber,
+                        'title' => $sonarrEpisode->title,
+                        'has_file' => $hasFile,
+                        'sonarr_file_id' => $hasFile ? $sonarrEpisode->episodeFileId : null,
+                        'file_codec' => $hasFile ? $this->getEpisodeFileCodec($sonarrEpisode->episodeFile) : null,
+                        'file_date_added' => $hasFile ? $sonarrEpisode->episodeFile->dateAdded : null,
+                    ],
+                );
             }
 
-            $episode->save();
-        }
+            $series->update([
+                'last_sonarr_sync_at' => now(),
+            ]);
+        });
     }
 
     /**
-     * Возвращает кодек эпизода
-     *
-     * @param  EpisodeFile  $episodeFile  Данные файла эпизода из Sonarr
+     * @param  array<SonarrEpisode>  $sonarrEpisodes
+     * @return array<int, Season>
      */
-    private function getEpisodeFileCodec(EpisodeFile $episodeFile): string
+    private function syncSeasons(Series $series, SonarrSeries $sonarrSeries, array $sonarrEpisodes): array
     {
-        if (in_array($episodeFile->mediaInfo->videoCodec, ['hevc', 'h.265', 'h265', 'x265'])) {
-            return 'hevc';
+        $seasonNumbers = collect($sonarrSeries->seasons)
+            ->map(fn(array $season): int => (int) ($season['seasonNumber'] ?? -1))
+            ->merge(array_map(fn(SonarrEpisode $episode): int => $episode->seasonNumber, $sonarrEpisodes))
+            ->filter(fn(int $seasonNumber): bool => $seasonNumber >= 0)
+            ->unique()
+            ->sort()
+            ->values();
+
+        $result = [];
+
+        foreach ($seasonNumbers as $seasonNumber) {
+            /** @var Season $season */
+            $season = $series->seasons()->firstOrCreate([
+                'number' => $seasonNumber,
+            ]);
+
+            $result[$seasonNumber] = $season;
         }
-        // ['avc', 'h.264', 'h264', 'x264']
-        return 'avc';
+
+        return $result;
+    }
+
+    private function getEpisodeFileCodec(EpisodeFile $episodeFile): Codec
+    {
+        $codec = strtolower(trim($episodeFile->mediaInfo->videoCodec));
+
+        return in_array($codec, ['hevc', 'h.265', 'h265', 'x265'], true)
+            ? Codec::HEVC
+            : Codec::AVC;
     }
 }
