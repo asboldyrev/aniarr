@@ -40,6 +40,10 @@ class SeriesUpdated implements ShouldBroadcastNow
             'seasons.downloads.items.episode',
         ]) ?? $this->series;
 
-        return (new SeriesResource($series))->resolve();
+        $payload = (new SeriesResource($series))
+            ->response()
+            ->getData(true);
+
+        return $payload['data'];
     }
 }
