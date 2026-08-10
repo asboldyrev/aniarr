@@ -10,23 +10,30 @@ final class SeasonResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $this->resource->loadMissing([
+            'rssFeed.releases',
+            'episodes',
+            'downloads.release',
+            'downloads.items.episode',
+        ]);
+
         /** @var Download|null $activeDownload */
-        $activeDownload = $this->relationLoaded('downloads')
-            ? $this->downloads
-                ->sortByDesc('id')
-                ->first(fn (Download $download): bool => $download->status->isActive())
-            : null;
+        $activeDownload = $this->downloads
+            ->sortByDesc('id')
+            ->first(fn (Download $download): bool => $download->status->isActive());
 
         return [
             'id' => $this->id,
             'number' => $this->number,
             'monitored' => $this->monitored,
-            'episodesCount' => $this->relationLoaded('episodes') ? $this->episodes->count() : null,
-            'filesCount' => $this->relationLoaded('episodes') ? $this->episodes->where('has_file', true)->count() : null,
+            'episodesCount' => $this->episodes->count(),
+            'filesCount' => $this->episodes->where('has_file', true)->count(),
             'activeDownload' => $activeDownload === null ? null : new DownloadResource($activeDownload),
             'rssFeed' => $this->rssFeed === null ? null : new RssFeedResource($this->rssFeed),
-            'episodes' => EpisodeResource::collection($this->whenLoaded('episodes')),
-            'downloads' => DownloadResource::collection($this->whenLoaded('downloads')),
+            'episodes' => EpisodeResource::collection($this->episodes),
+            'downloads' => DownloadResource::collection(
+                $this->downloads->sortByDesc('id')->values(),
+            ),
         ];
     }
 }
