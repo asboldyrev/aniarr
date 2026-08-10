@@ -43,25 +43,23 @@ final class SeriesController extends Controller
      */
     public function store(StoreSeriesRequest $request, AddSeriesAction $addSeries): JsonResponse
     {
-        $series = Series::query()->firstOrCreate([
-            'thetvdb_id' => $request->integer('thetvdb_id'),
-        ], [
-            'title' => $request->string('title')->toString(),
-            'thetvdb_slug' => $request->string('thetvdb_slug')->toString(),
-            'poster_url' => $request->input('poster_url'),
-            'year' => $request->integer('year') ?: null,
-            'monitored' => true,
-        ]);
+        $tvdbId = $request->integer('thetvdb_id');
+        $alreadyExists = Series::query()
+            ->where('thetvdb_id', $tvdbId)
+            ->exists();
 
         $addSeries->execute(
-            $request->integer('thetvdb_id'),
+            $tvdbId,
             $request->input('rss_feeds', []),
-            $series,
         );
 
+        $series = Series::query()
+            ->where('thetvdb_id', $tvdbId)
+            ->firstOrFail();
+
         return response()->json(
-            new SeriesResource($series->fresh()),
-            $series->wasRecentlyCreated ? 201 : 200,
+            new SeriesResource($series),
+            $alreadyExists ? 200 : 201,
         );
     }
 }
