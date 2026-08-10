@@ -4,12 +4,11 @@ namespace App\Actions;
 
 use App\Integrations\Sonarr\SonarrClient;
 use App\Integrations\Tvdb\TvdbClient;
-use App\Integrations\Tvdb\TvdbLocaleMapper;
+use App\Integrations\Tvdb\TvdbSeriesTitleResolver;
 use App\Jobs\AddSeriesToSonarrJob;
 use App\Jobs\SyncSeriesWithSonarrJob;
 use App\Models\Series;
 use App\Services\Logging\AniarrLogger;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Bus;
 
 /**
@@ -29,7 +28,7 @@ final class AddSeriesAction
             $series = Series::query()->firstOrCreate([
                 'thetvdb_id' => $tvdbId,
             ], [
-                'title' => self::getTitle($tvdbData),
+                'title' => app(TvdbSeriesTitleResolver::class)->resolve($tvdbData),
                 'thetvdb_slug' => $tvdbData['slug'],
                 'poster_url' => $posterUrl,
                 'year' => $tvdbData['year'],
@@ -66,39 +65,5 @@ final class AddSeriesAction
         }
 
         $logger->resetSeries();
-    }
-
-    private static function getTitle(array $tvdbData): string
-    {
-        $title = Arr::get($tvdbData, 'translation.name');
-        if ($title) {
-            return $title;
-        }
-
-        $aliasTitle = '';
-        $fallbackAliasTitle = '';
-
-        $locale = app(TvdbLocaleMapper::class)->map(config('app.locale'));
-        $fallbackLocale = app(TvdbLocaleMapper::class)->map(config('app.fallback_locale'));
-
-        foreach ($tvdbData['aliases'] as $alias) {
-            if ($alias['language'] == $locale) {
-                $aliasTitle = $alias['name'];
-            }
-
-            if ($alias['language'] == $fallbackLocale) {
-                $fallbackAliasTitle = $alias['name'];
-            }
-        }
-
-        if ($aliasTitle) {
-            return $aliasTitle;
-        }
-
-        if ($fallbackAliasTitle) {
-            return $fallbackAliasTitle;
-        }
-
-        return $tvdbData['name'] ?? 'unknown';
     }
 }
