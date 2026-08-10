@@ -135,4 +135,47 @@ class SyncSeriesStateFromSonarrActionTest extends TestCase
         $this->assertNull($episode->file_codec);
         $this->assertNull($episode->file_date_added);
     }
+
+    public function test_unknown_video_codec_is_not_treated_as_avc(): void
+    {
+        $series = Series::query()->create([
+            'title' => 'AV1 series',
+            'thetvdb_id' => 456,
+            'thetvdb_slug' => 'av1-series',
+        ]);
+
+        $sonarrSeries = SonarrSeries::makeFromResponse([
+            'id' => 84,
+            'tvdbId' => 456,
+            'seasons' => [['seasonNumber' => 1, 'monitored' => true]],
+        ]);
+
+        $sonarrClient = $this->mock(SonarrClient::class);
+        $sonarrClient->shouldReceive('getEpisodes')
+            ->once()
+            ->with(84)
+            ->andReturn([
+                SonarrEpisode::makeFromResponse([
+                    'id' => 2001,
+                    'seriesId' => 84,
+                    'seasonNumber' => 1,
+                    'episodeNumber' => 1,
+                    'title' => 'Episode 1',
+                    'hasFile' => true,
+                    'episodeFileId' => 6001,
+                    'episodeFile' => [
+                        'id' => 6001,
+                        'dateAdded' => '2026-08-10T10:00:00Z',
+                        'mediaInfo' => ['videoCodec' => 'AV1'],
+                    ],
+                ]),
+            ]);
+
+        app(SyncSeriesStateFromSonarrAction::class)->execute($series, $sonarrSeries, $sonarrClient);
+
+        $episode = $series->seasons()->firstOrFail()->episodes()->firstOrFail();
+
+        $this->assertTrue($episode->has_file);
+        $this->assertNull($episode->file_codec);
+    }
 }
