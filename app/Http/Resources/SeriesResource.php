@@ -29,17 +29,17 @@ class SeriesResource extends JsonResource
 
         /** @var Collection<int, Download> $downloads */
         $downloads = $this->seasons->flatMap(
-            fn(Season $season): Collection => $season->downloads,
+            fn (Season $season): Collection => $season->downloads,
         );
 
         /** @var Collection<int, Episode> $episodes */
         $episodes = $this->seasons->flatMap(
-            fn(Season $season): Collection => $season->episodes,
+            fn (Season $season): Collection => $season->episodes,
         );
 
         $activeDownload = $downloads
             ->sortByDesc('id')
-            ->first(fn(Download $download): bool => in_array($download->status, [
+            ->first(fn (Download $download): bool => in_array($download->status, [
                 DownloadStatus::PENDING,
                 DownloadStatus::PREPARING,
                 DownloadStatus::DOWNLOADING,
@@ -48,10 +48,10 @@ class SeriesResource extends JsonResource
 
         $lastFailedDownload = $downloads
             ->sortByDesc('id')
-            ->first(fn(Download $download): bool => $download->status === DownloadStatus::FAILED);
+            ->first(fn (Download $download): bool => $download->status === DownloadStatus::FAILED);
 
         $rssFeeds = $this->seasons
-            ->filter(fn(Season $season): bool => $season->rssFeed !== null)
+            ->filter(fn (Season $season): bool => $season->rssFeed !== null)
             ->map(function (Season $season): array {
                 $feed = $season->rssFeed;
 
@@ -87,10 +87,10 @@ class SeriesResource extends JsonResource
             'progress' => $activeDownload?->progress,
             'eta' => $activeDownload?->eta_seconds,
             'hasAvc' => $episodes->contains(
-                fn(Episode $episode): bool => $episode->has_file && $episode->file_codec === Codec::AVC,
+                fn (Episode $episode): bool => $episode->has_file && $episode->file_codec === Codec::AVC,
             ),
             'hasHevc' => $episodes->contains(
-                fn(Episode $episode): bool => $episode->has_file && $episode->file_codec === Codec::HEVC,
+                fn (Episode $episode): bool => $episode->has_file && $episode->file_codec === Codec::HEVC,
             ),
             'lastEpisodes' => [
                 'avc' => $this->lastEpisodeForCodec($episodes, Codec::AVC),
@@ -106,7 +106,7 @@ class SeriesResource extends JsonResource
                 ->map(function (Season $season): array {
                     $activeDownload = $season->downloads
                         ->sortByDesc('id')
-                        ->first(fn(Download $download): bool => in_array($download->status, [
+                        ->first(fn (Download $download): bool => in_array($download->status, [
                             DownloadStatus::PENDING,
                             DownloadStatus::PREPARING,
                             DownloadStatus::DOWNLOADING,
@@ -144,7 +144,7 @@ class SeriesResource extends JsonResource
     private function lastEpisodeForCodec(Collection $episodes, Codec $codec): ?int
     {
         $number = $episodes
-            ->filter(fn(Episode $episode): bool => $episode->has_file && $episode->file_codec === $codec)
+            ->filter(fn (Episode $episode): bool => $episode->has_file && $episode->file_codec === $codec)
             ->max('episode_number');
 
         return $number === null ? null : (int) $number;
