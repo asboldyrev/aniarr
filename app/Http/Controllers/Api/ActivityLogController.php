@@ -34,7 +34,7 @@ final class ActivityLogController extends Controller
             }
         }
 
-        if (($validated['unresolved'] ?? false) === true) {
+        if ($request->boolean('unresolved')) {
             $query->whereIn('type', [LogType::WARNING->value, LogType::ERROR->value])
                 ->whereNull('resolved_at');
         }
