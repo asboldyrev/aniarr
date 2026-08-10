@@ -14,13 +14,6 @@ use InvalidArgumentException;
 
 final class CreateDownloadFromPlanAction
 {
-    private const ACTIVE_STATUSES = [
-        DownloadStatus::PENDING,
-        DownloadStatus::PREPARING,
-        DownloadStatus::DOWNLOADING,
-        DownloadStatus::IMPORTING,
-    ];
-
     public function execute(
         Season $season,
         DownloadPlan $plan,
@@ -37,7 +30,7 @@ final class CreateDownloadFromPlanAction
             }
 
             $hasActiveDownload = $lockedSeason->downloads()
-                ->whereIn('status', array_map(fn (DownloadStatus $status) => $status->value, self::ACTIVE_STATUSES))
+                ->whereIn('status', DownloadStatus::activeValues())
                 ->exists();
 
             if ($hasActiveDownload) {
