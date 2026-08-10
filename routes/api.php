@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\SeriesController;
 use Illuminate\Support\Facades\Route;
 
 // Сериалы
+Route::get('/series', [SeriesController::class, 'index']);
+Route::get('/series/{series}', [SeriesController::class, 'show']);
 Route::post('/series', [SeriesController::class, 'store']);
 
 // Релизы
