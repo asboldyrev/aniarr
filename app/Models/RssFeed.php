@@ -10,50 +10,50 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
- * @property int $series_id
- * @property int|null $season_number
+ * @property int $season_id
  * @property string $rss_url
+ * @property bool $enabled
  * @property string|null $last_rss_hash
  * @property Carbon|null $last_rss_check
+ * @property Carbon|null $last_rss_success_at
+ * @property Carbon|null $last_error_at
+ * @property string|null $last_error
  * @property Carbon $created_at
  * @property Carbon $updated_at
- * @property-read Series $series
- * @property-read Collection<int, Torrent> $torrents
+ * @property-read Season $season
+ * @property-read Collection<int, Release> $releases
  */
 class RssFeed extends Model
 {
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
-        'series_id',
-        'season_number',
+        'season_id',
         'rss_url',
+        'enabled',
         'last_rss_hash',
         'last_rss_check',
+        'last_rss_success_at',
+        'last_error_at',
+        'last_error',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
-            'series_id' => 'integer',
-            'season_number' => 'integer',
+            'season_id' => 'integer',
+            'enabled' => 'boolean',
             'last_rss_check' => 'datetime',
+            'last_rss_success_at' => 'datetime',
+            'last_error_at' => 'datetime',
         ];
     }
 
-    /**
-     * Get the series that owns the RSS feed.
-     */
-    public function series(): BelongsTo
+    public function season(): BelongsTo
     {
-        return $this->belongsTo(Series::class);
+        return $this->belongsTo(Season::class);
+    }
+
+    public function releases(): HasMany
+    {
+        return $this->hasMany(Release::class);
     }
 }
