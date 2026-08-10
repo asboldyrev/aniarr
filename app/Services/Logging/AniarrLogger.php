@@ -4,6 +4,9 @@ namespace App\Services\Logging;
 
 use App\Enums\LogType;
 use App\Exceptions\BadMethodCallException;
+use App\Models\ActivityLog;
+use App\Models\Download;
+use App\Models\Season;
 use App\Models\Series;
 use Error;
 use Exception;
@@ -17,19 +20,100 @@ use Illuminate\Support\Str;
  */
 final class AniarrLogger
 {
-    protected ?Series $series;
+    private ?int $seriesId = null;
 
+    private ?int $seasonId = null;
+
+    private ?int $downloadId = null;
+
+    private ?string $source = null;
+
+    /**
+     * Возвращает отдельный logger со scope сериала.
+     *
+     * Используем clone, чтобы контекст singleton-сервиса не протекал между queue jobs.
+     */
+    public function forSeries(Series|int $series): self
+    {
+        $logger = clone $this;
+        $logger->seriesId = $series instanceof Series ? $series->id : $series;
+        $logger->seasonId = null;
+        $logger->downloadId = null;
+
+        return $logger;
+    }
+
+    /**
+     * Возвращает отдельный logger со scope сезона и его сериала.
+     */
+    public function forSeason(Season|int $season): self
+    {
+        $logger = clone $this;
+        $model = $season instanceof Season
+            ? $season
+            : Season::query()->find($season);
+
+        $logger->seasonId = $model?->id;
+        $logger->seriesId = $model?->series_id;
+        $logger->downloadId = null;
+
+        return $logger;
+    }
+
+    /**
+     * Возвращает отдельный logger со scope Download → Season → Series.
+     */
+    public function forDownload(Download|int $download): self
+    {
+        $logger = clone $this;
+        $model = $download instanceof Download
+            ? $download
+            : Download::query()->with('season')->find($download);
+
+        if ($model === null) {
+            $logger->seriesId = null;
+            $logger->seasonId = null;
+            $logger->downloadId = null;
+
+            return $logger;
+        }
+
+        $model->loadMissing('season');
+
+        $logger->downloadId = $model->id;
+        $logger->seasonId = $model->season_id;
+        $logger->seriesId = $model->season?->series_id;
+
+        return $logger;
+    }
+
+    public function withSource(string $source): self
+    {
+        $logger = clone $this;
+        $logger->source = $source;
+
+        return $logger;
+    }
+
+    /**
+     * Старый mutable API оставлен для совместимости с ещё не перенесённым кодом.
+     */
     public function setSeries(Series|int $id): void
     {
-        $this->series = Series::query()->find($id);
+        $this->seriesId = $id instanceof Series ? $id->id : $id;
+        $this->seasonId = null;
+        $this->downloadId = null;
     }
 
     public function resetSeries(): void
     {
-        $this->series = null;
+        $this->seriesId = null;
+        $this->seasonId = null;
+        $this->downloadId = null;
+        $this->source = null;
     }
 
-    public function __call(string $name, array $arguments)
+    public function __call(string $name, array $arguments): void
     {
         $message = array_shift($arguments);
         $context = count($arguments) ? array_shift($arguments) : [];
@@ -44,65 +128,120 @@ final class AniarrLogger
     }
 
     /**
-     * Записать сообщение в канал aniarr с указанным уровнем.
+     * Структурированное пользовательское событие.
      */
-    public function log(LogType $level, string $message, Exception|Error|array $context = []): void
-    {
-        if (is_array($context) && ! empty($context)) {
-            $context = json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        } elseif (is_array($context)) {
-            $context = '';
-        } else {
-            $context = implode("\n", $this->exceptionToContext($context));
-        }
-
-        if ($context) {
-            $formatted = sprintf(
-                "[%s] %s: %s\n%s\n",
-                now()->format('Y-m-d H:i:s'),
-                $level->name,
-                $message,
-                $context
-            );
-        } else {
-            $formatted = sprintf(
-                '[%s] %s: %s',
-                now()->format('Y-m-d H:i:s'),
-                $level->name,
-                $message
-            );
-        }
-
-        if (! empty($this->series) && $level != LogType::DEBUG) {
-            $this->series->activityLogs()->create([
-                'message' => Str::limit($message, 250),
-                'type' => $level,
-            ]);
-        }
-
-        if ($level == LogType::DEBUG && app()->isProduction()) {
-            return;
-        }
-
-        $logPath = storage_path('logs/aniarr.log');
-
-        file_put_contents($logPath, "$formatted\n", FILE_APPEND | LOCK_EX);
+    public function event(
+        string $event,
+        string $message,
+        LogType $type = LogType::INFO,
+        Exception|Error|array $context = [],
+    ): void {
+        $this->write($type, $message, $context, $event);
     }
 
     /**
-     * Записать ошибку исключения
+     * Записать техническое сообщение и, при наличии scope, ActivityLog.
      */
-    public function exception(Exception|Error $exception, ?string $url = null): void
+    public function log(LogType $level, string $message, Exception|Error|array $context = []): void
     {
+        $this->write($level, $message, $context);
+    }
+
+    /**
+     * Записать ошибку исключения.
+     */
+    public function exception(Exception|Error $exception, ?string $url = null, ?string $event = null): void
+    {
+        $context = [];
+
         if ($url) {
             $context['url'] = $url;
         }
 
         $context['exception'] = implode("\n", $this->exceptionToContext($exception, short: true));
 
-        $this->error("Code: {$exception->getCode()}, {$exception->getMessage()}", $context);
+        $message = "Code: {$exception->getCode()}, {$exception->getMessage()}";
+
+        if ($event !== null) {
+            $this->event($event, $message, LogType::ERROR, $context);
+
+            return;
+        }
+
+        $this->error($message, $context);
     }
 
+    private function write(
+        LogType $level,
+        string $message,
+        Exception|Error|array $context,
+        ?string $event = null,
+    ): void {
+        $normalizedContext = $this->normalizeContext($context);
+
+        if ($level !== LogType::DEBUG && $this->hasActivityScope()) {
+            ActivityLog::query()->create([
+                'series_id' => $this->seriesId,
+                'season_id' => $this->seasonId,
+                'download_id' => $this->downloadId,
+                'source' => $this->source,
+                'event' => $event,
+                'message' => Str::limit($message, 1000),
+                'type' => $level,
+                'context' => $normalizedContext === [] ? null : $normalizedContext,
+            ]);
+        }
+
+        if ($level === LogType::DEBUG && app()->isProduction()) {
+            return;
+        }
+
+        $formattedContext = $normalizedContext === []
+            ? ''
+            : json_encode(
+                $normalizedContext,
+                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT,
+            );
+
+        $formatted = sprintf(
+            '[%s] %s: %s%s',
+            now()->format('Y-m-d H:i:s'),
+            $level->name,
+            $message,
+            $formattedContext ? "\n{$formattedContext}" : '',
+        );
+
+        file_put_contents(
+            storage_path('logs/aniarr.log'),
+            $formatted."\n",
+            FILE_APPEND | LOCK_EX,
+        );
+    }
+
+    private function hasActivityScope(): bool
+    {
+        return $this->seriesId !== null
+            || $this->seasonId !== null
+            || $this->downloadId !== null;
+    }
+
+    /**
+     * @return array<string|int, mixed>
+     */
+    private function normalizeContext(Exception|Error|array $context): array
+    {
+        if (is_array($context)) {
+            return $context;
+        }
+
+        return [
+            'exception' => implode("\n", $this->exceptionToContext($context)),
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
     private function exceptionToContext(Exception|Error $exception, bool $short = false): array
     {
         $result = [
