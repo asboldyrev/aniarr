@@ -34,6 +34,7 @@ class SyncRssFeedActionTest extends TestCase
         $this->assertFalse($action->execute($feed->fresh(), $items));
         $this->assertCount(2, $feed->releases()->get());
         $this->assertSame($hash, $feed->fresh()->last_rss_hash);
+        $this->assertSame(2, $feed->releases()->where('is_current', true)->count());
     }
 
     public function test_same_episode_range_with_new_guid_is_saved_as_new_release(): void
@@ -53,10 +54,12 @@ class SyncRssFeedActionTest extends TestCase
         $this->assertDatabaseHas('releases', [
             'rss_feed_id' => $feed->id,
             'guid' => 'guid-v1',
+            'is_current' => false,
         ]);
         $this->assertDatabaseHas('releases', [
             'rss_feed_id' => $feed->id,
             'guid' => 'guid-v2',
+            'is_current' => true,
         ]);
     }
 
@@ -82,6 +85,7 @@ class SyncRssFeedActionTest extends TestCase
             'guid' => 'same-guid',
             'torrent_url' => 'https://example.test/v2.torrent',
             'size_bytes' => 200,
+            'is_current' => true,
         ]);
     }
 
