@@ -8,7 +8,6 @@ use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
-use Illuminate\Http\Request;
 use Illuminate\Queue\SerializesModels;
 
 class SeriesUpdated implements ShouldBroadcastNow
@@ -35,11 +34,12 @@ class SeriesUpdated implements ShouldBroadcastNow
     public function broadcastWith(): array
     {
         $series = $this->series->fresh([
-            'seasons.rssFeed',
+            'seasons.rssFeed.releases',
             'seasons.episodes',
-            'seasons.downloads',
+            'seasons.downloads.release',
+            'seasons.downloads.items.episode',
         ]) ?? $this->series;
 
-        return (new SeriesResource($series))->toArray(Request::create('/'));
+        return (new SeriesResource($series))->resolve();
     }
 }
