@@ -57,6 +57,11 @@ final class SyncSeriesWithSonarrJob implements ShouldQueue
 
             $logger->info('[Sonarr] Синхронизация с Sonarr прошла успешно');
             event(new SeriesUpdated($series->fresh()));
+
+            foreach ($series->seasons()->pluck('id') as $seasonId) {
+                PlanSeasonDownloadsJob::dispatch((int) $seasonId)
+                    ->onQueue('downloads');
+            }
         } catch (Throwable $e) {
             $logger->exception($e);
         } finally {
