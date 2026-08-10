@@ -26,6 +26,10 @@ final class SyncRssFeedAction
         $checkedAt = now();
 
         if ($rssFeed->last_rss_hash === $hash) {
+            $rssFeed->releases()->where('is_current', true)->update([
+                'last_seen_at' => $checkedAt,
+            ]);
+
             $rssFeed->update([
                 'last_rss_check' => $checkedAt,
                 'last_rss_success_at' => $checkedAt,
@@ -37,6 +41,10 @@ final class SyncRssFeedAction
         }
 
         DB::transaction(function () use ($rssFeed, $items, $hash, $checkedAt): void {
+            $rssFeed->releases()->where('is_current', true)->update([
+                'is_current' => false,
+            ]);
+
             /** @var FeedItem $item */
             foreach ($items->items as $item) {
                 if ($item->episodes === []) {
@@ -56,6 +64,8 @@ final class SyncRssFeedAction
                         'last_episode' => max($item->episodes),
                         'size_bytes' => $item->size > 0 ? $item->size : null,
                         'published_at' => $item->pubDate !== '' ? Carbon::parse($item->pubDate) : null,
+                        'is_current' => true,
+                        'last_seen_at' => $checkedAt,
                     ],
                 );
             }
