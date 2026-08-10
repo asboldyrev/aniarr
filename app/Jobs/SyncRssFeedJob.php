@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\SyncRssFeedAction;
+use App\Enums\LogType;
 use App\Events\RssFeedUpdated;
 use App\Models\RssFeed;
 use App\Services\Logging\AniarrLogger;
@@ -34,8 +35,9 @@ final class SyncRssFeedJob implements ShouldQueue
             return;
         }
 
-        $logger = app(AniarrLogger::class);
-        $logger->setSeries($rssFeed->season->series_id);
+        $logger = app(AniarrLogger::class)
+            ->forSeason($rssFeed->season)
+            ->withSource('rss');
 
         $rssFeed->update([
             'last_rss_check' => now(),
@@ -60,8 +62,10 @@ final class SyncRssFeedJob implements ShouldQueue
                     ->onQueue('downloads');
             }
 
-            $logger->info(
+            $logger->event(
+                $changed ? 'rss.updated' : 'rss.unchanged',
                 $changed ? '[RSS] Лента обновлена' : '[RSS] Лента не изменилась',
+                LogType::INFO,
                 [
                     'rss_feed_id' => $rssFeed->id,
                     'season' => $rssFeed->season->number,
@@ -74,11 +78,9 @@ final class SyncRssFeedJob implements ShouldQueue
                 'last_error' => $e->getMessage(),
             ]);
 
-            $logger->exception($e, $rssFeed->rss_url);
+            $logger->exception($e, $rssFeed->rss_url, 'rss.failed');
 
             throw $e;
-        } finally {
-            $logger->resetSeries();
         }
     }
 }
