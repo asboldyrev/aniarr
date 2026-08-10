@@ -18,24 +18,34 @@ class SonarrClient extends BaseApiClient
     protected string $apiKey;
 
     /**
-     * Проверяет, существует ли сериал в Sonarr по TVDB ID.
-     *
-     * @param  int  $tvdbId  Идентификатор сериала в TVDB
-     * @return bool true, если сериал существует
+     * Проверяет, добавлен ли сериал в Sonarr по TVDB ID.
      */
     public function hasSeries(int $tvdbId): bool
+    {
+        return $this->getSeriesByTvdbId($tvdbId) !== null;
+    }
+
+    /**
+     * Получить уже добавленный в Sonarr сериал по TVDB ID.
+     */
+    public function getSeriesByTvdbId(int $tvdbId): ?SonarrSeries
     {
         $response = $this->get('series', ['tvdbId' => $tvdbId]);
         $data = $response->successful() ? $response->json() : null;
 
-        return is_array($data) && ! empty($data);
+        if (! is_array($data) || empty($data)) {
+            return null;
+        }
+
+        $series = array_is_list($data) ? ($data[0] ?? null) : $data;
+
+        return is_array($series) ? SonarrSeries::makeFromResponse($series) : null;
     }
 
     /**
-     * Найти аниме по tvdb_id.
+     * Найти сериал через Sonarr lookup по TVDB ID.
      *
-     * @param  int  $tvdbId  Идентификатор сериала в TVDB
-     * @return SonarrSeries|null Данные сериала, если найден
+     * Используется для получения данных перед добавлением сериала в Sonarr.
      */
     public function findByTvdbId(int $tvdbId): ?SonarrSeries
     {
@@ -68,7 +78,7 @@ class SonarrClient extends BaseApiClient
         $response = $this->post('series', $payload);
         $data = $response->json();
 
-        if ($response->successful() && !empty($data)) {
+        if ($response->successful() && ! empty($data)) {
             return SonarrSeries::makeFromResponse($data);
         }
 
@@ -121,7 +131,7 @@ class SonarrClient extends BaseApiClient
     }
 
     /**
-     * Получить список серий для аниме.
+     * Получить список эпизодов для сериала.
      *
      * @param  int  $seriesId  ID сериала в Sonarr
      * @return array<SonarrEpisode> Список эпизодов
