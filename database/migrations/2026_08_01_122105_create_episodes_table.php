@@ -6,30 +6,24 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('episodes', function (Blueprint $table) {
             $table->id();
-            $table->string('title');
-            $table->foreignId('series_id')->constrained('series');
-            $table->integer('sonarr_id')->nullable();
-            $table->foreignId('torrent_id')->nullable()->constrained('torrents')->nullOnDelete();
-            $table->unsignedSmallInteger('season_number');
+            $table->foreignId('season_id')->constrained('seasons')->cascadeOnDelete();
+            $table->integer('sonarr_id')->nullable()->unique();
+            $table->integer('sonarr_file_id')->nullable();
             $table->unsignedSmallInteger('episode_number');
-            $table->enum('codec', ['avc', 'hevc']);
-            $table->timestamp('downloaded_at')->nullable();
+            $table->string('title');
+            $table->boolean('has_file')->default(false)->index();
+            $table->enum('file_codec', ['avc', 'hevc'])->nullable()->index();
+            $table->timestamp('file_date_added')->nullable();
             $table->timestamps();
 
-            $table->index(['series_id', 'season_number', 'episode_number']);
+            $table->unique(['season_id', 'episode_number']);
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('episodes');
