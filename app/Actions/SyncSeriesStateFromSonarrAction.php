@@ -91,12 +91,14 @@ final class SyncSeriesStateFromSonarrAction
         return $result;
     }
 
-    private function getEpisodeFileCodec(EpisodeFile $episodeFile): Codec
+    private function getEpisodeFileCodec(EpisodeFile $episodeFile): ?Codec
     {
         $codec = strtolower(trim($episodeFile->mediaInfo->videoCodec));
 
-        return in_array($codec, ['hevc', 'h.265', 'h265', 'x265'], true)
-            ? Codec::HEVC
-            : Codec::AVC;
+        return match ($codec) {
+            'hevc', 'h.265', 'h265', 'x265' => Codec::HEVC,
+            'avc', 'h.264', 'h264', 'x264' => Codec::AVC,
+            default => null,
+        };
     }
 }
