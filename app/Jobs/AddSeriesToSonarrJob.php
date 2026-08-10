@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Enums\LogType;
+use App\Integrations\Sonarr\Dto\RootFolder;
 use App\Integrations\Sonarr\Dto\SonarrSeries;
 use App\Integrations\Sonarr\SonarrClient;
 use App\Models\Series;
@@ -32,32 +34,36 @@ final class AddSeriesToSonarrJob implements ShouldQueue
             throw new RuntimeException("Не найден сериал Aniarr для добавления в Sonarr: {$this->seriesId}.");
         }
 
-        $logger = app(AniarrLogger::class);
-        $logger->setSeries($series->id);
+        $logger = app(AniarrLogger::class)
+            ->forSeries($series)
+            ->withSource('sonarr');
 
-        try {
-            if (! $sonarrClient->testConnection()) {
-                throw new RuntimeException('Sonarr недоступен.');
-            }
+        if (! $sonarrClient->testConnection()) {
+            throw new RuntimeException('Sonarr недоступен.');
+        }
 
-            // Между проверкой в AddSeriesAction и выполнением queued job сериал
-            // мог быть добавлен вручную или другим процессом.
-            $seriesInSonarr = $sonarrClient->getSeriesByTvdbId($series->thetvdb_id)
-                ?? $this->addSeriesToSonarr($sonarrClient, $series);
+        // Между проверкой в AddSeriesAction и выполнением queued job сериал
+        // мог быть добавлен вручную или другим процессом.
+        $existingSeries = $sonarrClient->getSeriesByTvdbId($series->thetvdb_id);
+        $seriesInSonarr = $existingSeries ?? $this->addSeriesToSonarr($sonarrClient, $series);
 
-            if ($seriesInSonarr->id <= 0) {
-                throw new RuntimeException('Sonarr вернул некорректный ID после добавления сериала.');
-            }
+        if ($seriesInSonarr->id <= 0) {
+            throw new RuntimeException('Sonarr вернул некорректный ID после добавления сериала.');
+        }
 
-            $series->update(['sonarr_id' => $seriesInSonarr->id]);
+        $series->update(['sonarr_id' => $seriesInSonarr->id]);
 
-            $logger->info('[Sonarr] Сериал добавлен в Sonarr', [
+        $logger->event(
+            $existingSeries === null ? 'sonarr.series_added' : 'sonarr.series_available',
+            $existingSeries === null
+                ? '[Sonarr] Сериал добавлен в Sonarr'
+                : '[Sonarr] Сериал уже доступен в Sonarr',
+            LogType::INFO,
+            [
                 'sonarr_id' => $seriesInSonarr->id,
                 'thetvdb_id' => $series->thetvdb_id,
-            ]);
-        } finally {
-            $logger->resetSeries();
-        }
+            ],
+        );
     }
 
     private function addSeriesToSonarr(SonarrClient $sonarrClient, Series $series): SonarrSeries
@@ -69,18 +75,12 @@ final class AddSeriesToSonarrJob implements ShouldQueue
             );
         }
 
-        $rootFolders = $sonarrClient->getRootFolders();
-        $rootFolder = array_find($rootFolders, fn ($folder) => ! empty($folder->path));
+        $rootFolder = $this->firstConfiguredRootFolder($sonarrClient->getRootFolders());
         if ($rootFolder === null) {
             throw new RuntimeException('В Sonarr не настроена корневая директория.');
         }
 
-        $qualityProfiles = $sonarrClient->getQualityProfiles();
-        $qualityProfile = array_find(
-            $qualityProfiles,
-            fn ($profile) => ! empty($profile['id']),
-        );
-
+        $qualityProfile = $this->firstQualityProfile($sonarrClient->getQualityProfiles());
         if ($qualityProfile === null) {
             throw new RuntimeException('В Sonarr не найден профиль качества.');
         }
@@ -96,5 +96,34 @@ final class AddSeriesToSonarrJob implements ShouldQueue
         }
 
         return $added;
+    }
+
+    /**
+     * @param  array<RootFolder>  $rootFolders
+     */
+    private function firstConfiguredRootFolder(array $rootFolders): ?RootFolder
+    {
+        foreach ($rootFolders as $rootFolder) {
+            if (trim($rootFolder->path) !== '') {
+                return $rootFolder;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<array<string, mixed>>  $qualityProfiles
+     * @return array<string, mixed>|null
+     */
+    private function firstQualityProfile(array $qualityProfiles): ?array
+    {
+        foreach ($qualityProfiles as $qualityProfile) {
+            if ((int) ($qualityProfile['id'] ?? 0) > 0) {
+                return $qualityProfile;
+            }
+        }
+
+        return null;
     }
 }
