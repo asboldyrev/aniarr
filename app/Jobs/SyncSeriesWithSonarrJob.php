@@ -3,83 +3,64 @@
 namespace App\Jobs;
 
 use App\Actions\SyncSeriesStateFromSonarrAction;
-use App\Enums\Status;
 use App\Events\SeriesUpdated;
 use App\Integrations\Sonarr\SonarrClient;
 use App\Models\Series;
 use App\Services\Logging\AniarrLogger;
-use App\Services\SeriesStatsBroadcaster;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Throwable;
 
 /**
- * Задача синхронизации сериала с Sonarr (получение состояния, эпизодов, статуса загрузки).
+ * Синхронизирует фактическое состояние сериала с Sonarr.
  */
-class SyncSeriesWithSonarrJob implements ShouldQueue
+final class SyncSeriesWithSonarrJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * Создаёт новый экземпляр задачи.
-     */
     public function __construct(
-        public int $seriesId
+        public int $seriesId,
     ) {}
 
-    /**
-     * Выполняет задачу.
-     */
-    public function handle(SonarrClient $sonarrService): void
-    {
+    public function handle(
+        SonarrClient $sonarrClient,
+        SyncSeriesStateFromSonarrAction $syncAction,
+    ): void {
+        /** @var Series|null $series */
         $series = Series::find($this->seriesId);
-        if (! $series) {
+        if ($series === null || ! $series->thetvdb_id) {
             return;
         }
+
+        $logger = app(AniarrLogger::class);
+        $logger->setSeries($series->id);
 
         try {
-            $this->runSyncFromSonarrOnly($sonarrService, $series);
-        } catch (\Throwable $e) {
-            app(AniarrLogger::class)->error('[Sonarr] Синхронизация с Sonar завершилась с ошибкой', $e);
-            $series->update([
-                'status' => Status::ERROR,
-                'sonar_id' => null,
-                'last_updated' => now(),
-            ]);
+            if (! $sonarrClient->testConnection()) {
+                $logger->warning('[Sonarr] Синхронизация пропущена: Sonarr недоступен');
 
-            SeriesStatsBroadcaster::broadcast();
+                return;
+            }
+
+            $seriesInSonarr = $sonarrClient->getSeriesByTvdbId($series->thetvdb_id);
+            if ($seriesInSonarr === null) {
+                $series->update(['sonarr_id' => null]);
+                $logger->warning('[Sonarr] Сериал не найден среди добавленных сериалов');
+
+                return;
+            }
+
+            $syncAction->execute($series, $seriesInSonarr, $sonarrClient);
+
+            $logger->info('[Sonarr] Синхронизация с Sonarr прошла успешно');
+            event(new SeriesUpdated($series->fresh()));
+        } catch (Throwable $e) {
+            $logger->exception($e);
+        } finally {
+            $logger->resetSeries();
         }
-    }
-
-    /**
-     * Только синхронизировать данные из Sonarr в проект (для задачи). Сериал должен уже быть в Sonarr.
-     */
-    public function runSyncFromSonarrOnly(SonarrClient $sonarrClient, Series $series): void
-    {
-        $sonarrClient = app(SonarrClient::class);
-        if (! $sonarrClient->testConnection() || ! $series->thetvdb_id) {
-            $series->update(['sonar_id' => false, 'last_updated' => now()]);
-
-            return;
-        }
-
-        $seriesInSonarr = $sonarrClient->findByTvdbId($series->thetvdb_id);
-
-        if ($seriesInSonarr === null) {
-            $series->update(['sonar_id' => false, 'last_updated' => now()]);
-
-            return;
-        }
-
-        (new SyncSeriesStateFromSonarrAction)->execute($series, $seriesInSonarr, $sonarrClient);
-        $series->update(['sonarr_id' => $seriesInSonarr->id, 'last_updated' => now()]);
-
-        app(AniarrLogger::class)->info('[Sonarr] Синхронизация с Sonarr прошла успешно');
-
-        event(new SeriesUpdated($series->fresh()));
-
-        SeriesStatsBroadcaster::broadcast();
     }
 }
