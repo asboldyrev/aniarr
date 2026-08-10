@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\SyncSeriesStateFromSonarrAction;
+use App\Enums\LogType;
 use App\Events\SeriesUpdated;
 use App\Integrations\Sonarr\SonarrClient;
 use App\Models\Series;
@@ -35,12 +36,17 @@ final class SyncSeriesWithSonarrJob implements ShouldQueue
             return;
         }
 
-        $logger = app(AniarrLogger::class);
-        $logger->setSeries($series->id);
+        $logger = app(AniarrLogger::class)
+            ->forSeries($series)
+            ->withSource('sonarr');
 
         try {
             if (! $sonarrClient->testConnection()) {
-                $logger->warning('[Sonarr] Синхронизация пропущена: Sonarr недоступен');
+                $logger->event(
+                    'sonarr.unavailable',
+                    '[Sonarr] Синхронизация пропущена: Sonarr недоступен',
+                    LogType::WARNING,
+                );
 
                 return;
             }
@@ -48,14 +54,25 @@ final class SyncSeriesWithSonarrJob implements ShouldQueue
             $seriesInSonarr = $sonarrClient->getSeriesByTvdbId($series->thetvdb_id);
             if ($seriesInSonarr === null) {
                 $series->update(['sonarr_id' => null]);
-                $logger->warning('[Sonarr] Сериал не найден среди добавленных сериалов');
+                $logger->event(
+                    'sonarr.series_missing',
+                    '[Sonarr] Сериал не найден среди добавленных сериалов',
+                    LogType::WARNING,
+                    ['thetvdb_id' => $series->thetvdb_id],
+                );
 
                 return;
             }
 
             $syncAction->execute($series, $seriesInSonarr, $sonarrClient);
 
-            $logger->info('[Sonarr] Синхронизация с Sonarr прошла успешно');
+            $logger->event(
+                'sonarr.synced',
+                '[Sonarr] Синхронизация с Sonarr прошла успешно',
+                LogType::INFO,
+                ['sonarr_id' => $seriesInSonarr->id],
+            );
+
             event(new SeriesUpdated($series->fresh()));
 
             foreach ($series->seasons()->pluck('id') as $seasonId) {
@@ -63,9 +80,9 @@ final class SyncSeriesWithSonarrJob implements ShouldQueue
                     ->onQueue('downloads');
             }
         } catch (Throwable $e) {
-            $logger->exception($e);
-        } finally {
-            $logger->resetSeries();
+            $logger->exception($e, event: 'sonarr.sync_failed');
+
+            throw $e;
         }
     }
 }
