@@ -4,6 +4,7 @@ namespace App\Actions\Downloads;
 
 use App\Enums\DownloadStatus;
 use App\Enums\DownloadTrigger;
+use App\Exceptions\ActiveDownloadExists;
 use App\Jobs\PrepareDownloadJob;
 use App\Models\Download;
 use App\Models\Season;
@@ -40,16 +41,20 @@ final class CreateDownloadFromPlanAction
                 ->exists();
 
             if ($hasActiveDownload) {
+                if ($trigger === DownloadTrigger::MANUAL) {
+                    throw new ActiveDownloadExists($lockedSeason->id);
+                }
+
                 return null;
             }
 
             $release = $plan->release->fresh('rssFeed');
             if (
                 $release === null
-                || ! $release->is_current
                 || $release->rssFeed->season_id !== $lockedSeason->id
+                || ($trigger === DownloadTrigger::AUTOMATIC && ! $release->is_current)
             ) {
-                throw new InvalidArgumentException('Release does not belong to the target season or is no longer current.');
+                throw new InvalidArgumentException('Release does not belong to the target season or is no longer available for this trigger.');
             }
 
             if ($plan->items === []) {
