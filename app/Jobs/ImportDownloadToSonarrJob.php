@@ -73,12 +73,30 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
                     throw new RuntimeException('Sonarr не вернул command id для ManualImport.');
                 }
 
-                $status = $this->waitForSonarrCommand($sonarrClient, $commandId);
+                $commandResult = $this->waitForSonarrCommand($sonarrClient, $commandId);
+                if ($commandResult === null) {
+                    throw new RuntimeException('Таймаут ожидания ManualImport Sonarr.');
+                }
+
+                $status = (string) ($commandResult['status'] ?? '');
                 if ($status !== 'completed') {
+                    $details = $this->getSonarrCommandFailureDetails($commandResult);
+
+                    $logger->event(
+                        'download.import_command_failed',
+                        '[Sonarr] ManualImport завершился с ошибкой',
+                        LogType::ERROR,
+                        [
+                            'command_id' => $commandId,
+                            'status' => $status,
+                            'message' => $commandResult['message'] ?? null,
+                            'body' => $commandResult['body'] ?? null,
+                            'result' => $commandResult['result'] ?? null,
+                        ],
+                    );
+
                     throw new RuntimeException(
-                        $status === 'failed'
-                            ? 'ManualImport Sonarr завершился с ошибкой.'
-                            : 'Таймаут ожидания ManualImport Sonarr.',
+                        'ManualImport Sonarr завершился с ошибкой'.($details !== '' ? ': '.$details : '.'),
                     );
                 }
 
@@ -145,7 +163,10 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
         return $files;
     }
 
-    private function waitForSonarrCommand(SonarrClient $sonarrClient, int $commandId): string
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function waitForSonarrCommand(SonarrClient $sonarrClient, int $commandId): ?array
     {
         $deadline = time() + self::SONARR_COMMAND_TIMEOUT;
 
@@ -158,11 +179,36 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
 
             $status = (string) ($command['status'] ?? '');
             if (in_array($status, ['completed', 'failed'], true)) {
-                return $status;
+                return $command;
             }
         }
 
-        return 'timeout';
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $command
+     */
+    private function getSonarrCommandFailureDetails(array $command): string
+    {
+        foreach (['message', 'errorMessage', 'result'] as $key) {
+            $value = $command[$key] ?? null;
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
+            }
+        }
+
+        $body = $command['body'] ?? null;
+        if (is_array($body)) {
+            foreach (['message', 'errorMessage'] as $key) {
+                $value = $body[$key] ?? null;
+                if (is_string($value) && trim($value) !== '') {
+                    return trim($value);
+                }
+            }
+        }
+
+        return '';
     }
 
     public function failed(?Throwable $e): void
