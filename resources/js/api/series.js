@@ -23,3 +23,11 @@ export async function updateSeriesMonitoring(id, monitored) {
 
     return response.data?.data ?? response.data ?? null
 }
+
+export async function deleteSeries(id, deleteFromSonarr = false) {
+    await apiClient.delete(`/series/${id}`, {
+        data: {
+            delete_from_sonarr: deleteFromSonarr,
+        },
+    })
+}
