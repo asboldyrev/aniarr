@@ -28,6 +28,7 @@
             <ReleaseList
                 :releases="season.rssFeed?.releases ?? []"
                 :episodes="season.episodes ?? []"
+                :downloads="season.downloads ?? []"
                 :has-active-download="Boolean(season.activeDownload)"
                 @downloaded="$emit('downloaded')"
             />
