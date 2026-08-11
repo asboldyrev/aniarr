@@ -33,11 +33,13 @@
 
     const props = defineProps({
         feed: { type: Object, default: null },
+        monitored: { type: Boolean, default: true },
     })
 
     const state = computed(() => {
         const feed = props.feed
         if (! feed) return 'missing'
+        if (! props.monitored) return 'paused'
 
         const hasCurrentError = feed.lastErrorAt
             && feed.lastError
@@ -51,6 +53,7 @@
     const shortLabel = computed(() => ({
         healthy: 'Активен',
         error: 'Ошибка',
+        paused: 'Приостановлен',
         disabled: 'Отключён',
         missing: 'Нет RSS',
     }[state.value]))
@@ -58,6 +61,7 @@
     const statusLabel = computed(() => ({
         healthy: 'Лента включена и работает',
         error: 'Последняя проверка завершилась ошибкой',
+        paused: 'Мониторинг Aniarr отключён, RSS временно не проверяется',
         disabled: 'Лента настроена, но отключена',
         missing: 'RSS-лента для сезона не настроена',
     }[state.value]))
