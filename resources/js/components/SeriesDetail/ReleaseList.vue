@@ -22,24 +22,52 @@
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-2">
-                                <Badge variant="outline" class="uppercase">{{ release.codec }}</Badge>
+                                <Badge
+                                    variant="outline"
+                                    class="uppercase"
+                                    :class="release.codec === 'hevc'
+                                        ? 'border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300'
+                                        : 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300'"
+                                >
+                                    {{ release.codec }}
+                                </Badge>
                                 <Badge v-if="release.quality" variant="outline">{{ release.quality }}</Badge>
 
-                                <Badge v-if="release.isCurrent" variant="secondary">
+                                <Badge
+                                    v-if="release.isCurrent"
+                                    variant="outline"
+                                    class="border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300"
+                                >
                                     Актуальный RSS
                                 </Badge>
 
-                                <Badge v-if="downloadState(release) === 'active'">
+                                <Badge
+                                    v-if="downloadState(release) === 'active'"
+                                    variant="outline"
+                                    class="border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300"
+                                >
                                     Загружается
                                 </Badge>
-                                <Badge v-else-if="downloadState(release) === 'completed'" variant="secondary">
+                                <Badge
+                                    v-else-if="downloadState(release) === 'completed'"
+                                    variant="outline"
+                                    class="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                                >
                                     Скачан
                                 </Badge>
-                                <Badge v-else-if="downloadState(release) === 'failed'" variant="destructive">
+                                <Badge
+                                    v-else-if="downloadState(release) === 'failed'"
+                                    variant="outline"
+                                    class="border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300"
+                                >
                                     Ошибка загрузки
                                 </Badge>
 
-                                <Badge v-if="! release.isCurrent && downloadState(release) === null" variant="outline">
+                                <Badge
+                                    v-if="! release.isCurrent && downloadState(release) === null"
+                                    variant="outline"
+                                    class="border-slate-500/30 bg-slate-500/10 text-slate-600 dark:text-slate-300"
+                                >
                                     История
                                 </Badge>
                             </div>
