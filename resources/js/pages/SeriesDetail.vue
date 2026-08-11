@@ -23,6 +23,7 @@
                         :season="season"
                         :series-monitored="series.monitored"
                         @downloaded="refreshSeries"
+                        @changed="refreshSeries"
                     />
                 </div>
 
