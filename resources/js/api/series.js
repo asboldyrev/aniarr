@@ -17,3 +17,9 @@ export async function createSeries(payload) {
 
     return response.data?.data ?? response.data ?? null
 }
+
+export async function updateSeriesMonitoring(id, monitored) {
+    const response = await apiClient.patch(`/series/${id}/monitoring`, { monitored })
+
+    return response.data?.data ?? response.data ?? null
+}
