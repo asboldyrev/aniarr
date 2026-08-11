@@ -24,6 +24,7 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     private const SONARR_COMMAND_TIMEOUT = 300;
+    private const MANUAL_IMPORT_READY_TIMEOUT = 30;
     private const POLL_INTERVAL = 3;
 
     public int $tries = 5;
@@ -145,11 +146,27 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
         $folder = $torrent->content_path !== ''
             ? $torrent->content_path
             : $torrent->save_path;
+        $savePath = rtrim($torrent->save_path, '/');
 
-        $candidates = $sonarrClient->getManualImportCandidates($folder);
-        if ($candidates === []) {
-            throw new RuntimeException('Sonarr не вернул кандидатов ManualImport для папки '.$folder.'.');
+        $expectedPaths = [];
+        foreach ($download->items as $item) {
+            if (! $item->episode->sonarr_id || ! $item->torrent_file_name) {
+                continue;
+            }
+
+            $path = $savePath.'/'.ltrim($item->torrent_file_name, '/');
+            $expectedPaths[$this->normalizePath($path)] = $path;
         }
+
+        if ($expectedPaths === []) {
+            return [];
+        }
+
+        $candidates = $this->waitForManualImportCandidates(
+            $sonarrClient,
+            $folder,
+            array_keys($expectedPaths),
+        );
 
         $candidatePaths = [];
         $candidatesByPath = [];
@@ -161,14 +178,22 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
             }
         }
 
-        $logger->event('download.manual_import_candidates', '[Sonarr] Получены кандидаты ManualImport', LogType::INFO, [
+        $missingPaths = array_values(array_diff(array_keys($expectedPaths), array_keys($candidatesByPath)));
+        if ($missingPaths !== []) {
+            throw new RuntimeException(
+                'Sonarr не увидел все файлы для ManualImport за '.self::MANUAL_IMPORT_READY_TIMEOUT.' сек. Отсутствуют: '
+                .implode(', ', array_map(fn (string $path): string => $expectedPaths[$path] ?? $path, $missingPaths)),
+            );
+        }
+
+        $logger->event('download.manual_import_candidates', '[Sonarr] Файлы готовы к ManualImport', LogType::INFO, [
             'folder' => $folder,
+            'expected_files_count' => count($expectedPaths),
             'candidates_count' => count($candidates),
             'candidate_paths' => array_slice($candidatePaths, 0, 20),
         ]);
 
         $files = [];
-        $savePath = rtrim($torrent->save_path, '/');
 
         foreach ($download->items as $item) {
             $episode = $item->episode;
@@ -202,6 +227,49 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
         }
 
         return $files;
+    }
+
+    /**
+     * @param  array<int, string>  $expectedPaths
+     * @return array<int, array<string, mixed>>
+     */
+    private function waitForManualImportCandidates(
+        SonarrClient $sonarrClient,
+        string $folder,
+        array $expectedPaths,
+    ): array {
+        $deadline = time() + self::MANUAL_IMPORT_READY_TIMEOUT;
+        $lastCandidates = [];
+
+        do {
+            $lastCandidates = $sonarrClient->getManualImportCandidates($folder);
+
+            $visiblePaths = [];
+            foreach ($lastCandidates as $candidate) {
+                $path = $this->normalizePath((string) ($candidate['path'] ?? ''));
+                if ($path !== '') {
+                    $visiblePaths[$path] = true;
+                }
+            }
+
+            $allExpectedFilesVisible = true;
+            foreach ($expectedPaths as $expectedPath) {
+                if (! isset($visiblePaths[$expectedPath])) {
+                    $allExpectedFilesVisible = false;
+                    break;
+                }
+            }
+
+            if ($allExpectedFilesVisible) {
+                return $lastCandidates;
+            }
+
+            if (time() < $deadline) {
+                sleep(self::POLL_INTERVAL);
+            }
+        } while (time() < $deadline);
+
+        return $lastCandidates;
     }
 
     private function normalizePath(string $path): string
