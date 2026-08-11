@@ -14,6 +14,7 @@ Route::get('/tvdb/series/search', TvdbSeriesSearchController::class);
 Route::get('/series', [SeriesController::class, 'index']);
 Route::get('/series/{series}', [SeriesController::class, 'show']);
 Route::post('/series', [SeriesController::class, 'store']);
+Route::patch('/series/{series}/monitoring', [SeriesController::class, 'updateMonitoring']);
 
 // Загрузки
 Route::get('/downloads', [DownloadController::class, 'index']);
