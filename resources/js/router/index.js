@@ -26,7 +26,7 @@ const router = createRouter({
         {
             path: '/activity',
             name: 'activity',
-            component: () => import('@/pages/Errors.vue'),
+            component: () => import('@/pages/Activity.vue'),
         },
         {
             path: '/errors',
