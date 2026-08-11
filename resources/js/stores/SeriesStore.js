@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { createSeries, getSeries, getSeriesList } from '@/api/series'
+import { createSeries, getSeries, getSeriesList, updateSeriesMonitoring } from '@/api/series'
 
 export default defineStore('series', () => {
     const items = ref([])
@@ -78,6 +78,23 @@ export default defineStore('series', () => {
         }
     }
 
+    async function setMonitoring(id, monitored) {
+        error.value = null
+
+        try {
+            const series = await updateSeriesMonitoring(id, monitored)
+
+            if (series) {
+                upsert(series)
+            }
+
+            return series
+        } catch (exception) {
+            error.value = exception
+            throw exception
+        }
+    }
+
     return {
         items,
         current,
@@ -88,5 +105,6 @@ export default defineStore('series', () => {
         fetchAll,
         fetchOne,
         create,
+        setMonitoring,
     }
 })
