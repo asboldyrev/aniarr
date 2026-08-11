@@ -51,6 +51,7 @@ final class SeriesController extends Controller
         $addSeries->execute(
             $tvdbId,
             $request->input('rss_feeds', []),
+            monitored: $request->monitored(),
         );
 
         $series = Series::query()
