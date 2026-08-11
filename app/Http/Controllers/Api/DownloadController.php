@@ -15,6 +15,7 @@ final class DownloadController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'in:'.implode(',', array_map(
                 fn (DownloadStatus $status): string => $status->value,
                 DownloadStatus::cases(),
@@ -31,6 +32,13 @@ final class DownloadController extends Controller
         $query = Download::query()
             ->with($this->relations())
             ->latest('id');
+
+        if (! empty($validated['search'])) {
+            $search = trim($validated['search']);
+
+            $query->whereHas('season.series', fn ($seriesQuery) => $seriesQuery
+                ->where('title', 'like', '%'.$search.'%'));
+        }
 
         if (isset($validated['status'])) {
             $query->where('status', $validated['status']);
