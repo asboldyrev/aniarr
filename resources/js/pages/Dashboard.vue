@@ -1,14 +1,8 @@
 <template>
     <div class="space-y-5 p-4 sm:space-y-6 sm:p-6">
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-                <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Обзор</h1>
-                <p class="mt-1 text-sm text-muted-foreground">Текущее состояние библиотеки и автоматических загрузок</p>
-            </div>
-
-            <RouterLink to="/library" class="text-sm font-medium text-muted-foreground hover:text-foreground">
-                Открыть библиотеку
-            </RouterLink>
+        <div>
+            <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Обзор</h1>
+            <p class="mt-1 text-sm text-muted-foreground">Текущее состояние библиотеки и автоматических загрузок</p>
         </div>
 
         <div v-if="seriesStore.loading && items.length === 0" class="flex min-h-72 items-center justify-center">
@@ -31,11 +25,11 @@
             />
 
             <section class="grid gap-4 xl:grid-cols-2">
-                <ActiveDownloadsCard :downloads="activeDownloads" />
+                <RecentSeriesCard :series="recentSeries" />
                 <NeedsAttentionCard :items="attentionItems" />
             </section>
 
-            <RecentSeriesCard :series="recentSeries" />
+            <ActiveDownloadsCard :downloads="activeDownloads" />
         </template>
     </div>
 </template>
