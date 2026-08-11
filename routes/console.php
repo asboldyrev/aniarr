@@ -17,7 +17,6 @@ Schedule::call(function (): void {
 
 Schedule::call(function (): void {
     Series::query()
-        ->where('monitored', true)
         ->pluck('id')
         ->each(fn (int $seriesId) => SyncSeriesWithSonarrJob::dispatch($seriesId));
 })->name('SyncSeriesWithSonarr')->hourly();
