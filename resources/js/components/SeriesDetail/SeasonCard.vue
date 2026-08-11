@@ -10,8 +10,8 @@
                 </div>
 
                 <div class="flex flex-wrap gap-2">
-                    <Badge :variant="season.monitored ? 'secondary' : 'outline'">
-                        {{ season.monitored ? 'Мониторинг' : 'Отключён' }}
+                    <Badge :variant="effectiveMonitored ? 'secondary' : 'outline'">
+                        {{ effectiveMonitored ? 'Мониторинг' : 'Приостановлен' }}
                     </Badge>
                     <Badge v-if="missingCount > 0" variant="outline">Нет {{ missingCount }}</Badge>
                 </div>
@@ -20,7 +20,7 @@
 
         <CardContent class="space-y-3 p-4 pt-0 sm:p-5 sm:pt-0">
             <div class="grid gap-3 lg:grid-cols-2">
-                <SeasonRssStatus :feed="season.rssFeed" />
+                <SeasonRssStatus :feed="season.rssFeed" :monitored="effectiveMonitored" />
                 <SeasonDownload :download="season.activeDownload" />
             </div>
 
@@ -47,9 +47,11 @@
 
     const props = defineProps({
         season: { type: Object, required: true },
+        seriesMonitored: { type: Boolean, default: true },
     })
 
     defineEmits(['downloaded'])
 
+    const effectiveMonitored = computed(() => props.seriesMonitored && props.season.monitored)
     const missingCount = computed(() => Math.max(0, Number(props.season.episodesCount ?? 0) - Number(props.season.filesCount ?? 0)))
 </script>
