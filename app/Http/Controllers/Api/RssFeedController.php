@@ -7,11 +7,33 @@ use App\Http\Requests\UpdateRssFeedRequest;
 use App\Http\Resources\RssFeedResource;
 use App\Jobs\SyncRssFeedJob;
 use App\Models\RssFeed;
+use App\Models\Season;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 final class RssFeedController extends Controller
 {
+    public function store(UpdateRssFeedRequest $request, Season $season): RssFeedResource
+    {
+        $season->loadMissing('series');
+
+        $rssFeed = $season->rssFeed()->updateOrCreate([], [
+            'rss_url' => $request->string('rss_url')->toString(),
+            'enabled' => $request->boolean('enabled'),
+            'last_rss_hash' => null,
+            'last_rss_check' => null,
+            'last_rss_success_at' => null,
+            'last_error_at' => null,
+            'last_error' => null,
+        ]);
+
+        if ($rssFeed->enabled && $season->monitored && $season->series->monitored) {
+            SyncRssFeedJob::dispatch($rssFeed->id);
+        }
+
+        return new RssFeedResource($rssFeed->load('releases'));
+    }
+
     public function update(UpdateRssFeedRequest $request, RssFeed $rssFeed): RssFeedResource
     {
         $rssFeed->loadMissing('season.series');
