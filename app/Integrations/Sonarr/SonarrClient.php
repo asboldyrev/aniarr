@@ -67,15 +67,17 @@ class SonarrClient extends BaseApiClient
     }
 
     /**
-     * Просит Sonarr самостоятельно разобрать файлы для ManualImport.
+     * Просит Sonarr самостоятельно разобрать файлы из download-папки.
+     *
+     * Важно: нельзя передавать seriesId без downloadId. В Sonarr такой запрос
+     * переключается на сканирование библиотечной папки Series и игнорирует folder.
      *
      * @return array<int, array<string, mixed>>
      */
-    public function getManualImportCandidates(string $folder, int $seriesId): array
+    public function getManualImportCandidates(string $folder): array
     {
         $response = $this->get('manualimport', [
             'folder' => $folder,
-            'seriesId' => $seriesId,
             'filterExistingFiles' => 'false',
         ]);
 
