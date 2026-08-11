@@ -10,10 +10,21 @@
                 </div>
 
                 <div class="flex flex-wrap gap-2">
-                    <Badge :variant="effectiveMonitored ? 'secondary' : 'outline'">
+                    <Badge
+                        variant="outline"
+                        :class="effectiveMonitored
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                            : 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'"
+                    >
                         {{ effectiveMonitored ? 'Мониторинг' : 'Приостановлен' }}
                     </Badge>
-                    <Badge v-if="missingCount > 0" variant="outline">Нет {{ missingCount }}</Badge>
+                    <Badge
+                        v-if="missingCount > 0"
+                        variant="outline"
+                        class="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                    >
+                        Нет {{ missingCount }}
+                    </Badge>
                 </div>
             </div>
         </CardHeader>
