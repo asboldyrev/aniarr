@@ -71,6 +71,10 @@ export function getSeriesRssState(series) {
         return 'missing'
     }
 
+    if (! series?.monitored) {
+        return 'paused'
+    }
+
     const hasCurrentError = feeds.some((feed) => {
         if (! feed.lastErrorAt || ! feed.lastError) {
             return false
