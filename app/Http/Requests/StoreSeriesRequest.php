@@ -19,9 +19,15 @@ final class StoreSeriesRequest extends FormRequest
     {
         return [
             'thetvdb_id' => ['required', 'integer', 'min:1'],
+            'monitored' => ['sometimes', 'boolean'],
             'rss_feeds' => ['required', 'array', 'min:1'],
             'rss_feeds.*.rss_url' => ['required', 'url', 'max:500'],
             'rss_feeds.*.season_number' => ['nullable', 'integer', 'min:0'],
         ];
+    }
+
+    public function monitored(): bool
+    {
+        return $this->boolean('monitored', true);
     }
 }
