@@ -31,7 +31,13 @@
 
         <CardContent class="space-y-3 p-4 pt-0 sm:p-5 sm:pt-0">
             <div class="grid gap-3 lg:grid-cols-2">
-                <SeasonRssStatus :feed="season.rssFeed" :monitored="effectiveMonitored" />
+                <SeasonRssStatus
+                    :feed="season.rssFeed"
+                    :monitored="effectiveMonitored"
+                    :season-id="season.id"
+                    :season-number="season.number"
+                    @changed="$emit('changed')"
+                />
                 <SeasonDownload :download="season.activeDownload" />
             </div>
 
@@ -61,7 +67,7 @@
         seriesMonitored: { type: Boolean, default: true },
     })
 
-    defineEmits(['downloaded'])
+    defineEmits(['downloaded', 'changed'])
 
     const effectiveMonitored = computed(() => props.seriesMonitored && props.season.monitored)
     const missingCount = computed(() => Math.max(0, Number(props.season.episodesCount ?? 0) - Number(props.season.filesCount ?? 0)))
