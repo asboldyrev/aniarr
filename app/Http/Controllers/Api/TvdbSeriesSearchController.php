@@ -16,6 +16,7 @@ final class TvdbSeriesSearchController extends Controller
         ]);
 
         $results = collect($tvdbClient->search($validated['query']))
+            ->filter(fn ($item): bool => is_array($item))
             ->map(fn (array $item): array => $this->normalize($item))
             ->filter(fn (array $item): bool => $item['thetvdbId'] > 0 && $item['title'] !== '')
             ->values()
