@@ -4,7 +4,11 @@ use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\DownloadController;
 use App\Http\Controllers\Api\ReleaseDownloadController;
 use App\Http\Controllers\Api\SeriesController;
+use App\Http\Controllers\Api\TvdbSeriesSearchController;
 use Illuminate\Support\Facades\Route;
+
+// TheTVDB
+Route::get('/tvdb/series/search', TvdbSeriesSearchController::class);
 
 // Сериалы
 Route::get('/series', [SeriesController::class, 'index']);
