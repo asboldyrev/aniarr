@@ -48,6 +48,7 @@
                             TheTVDB
                         </a>
                     </Button>
+                    <SeriesDeleteDialog :series="series" />
                 </div>
 
                 <div class="flex items-center gap-3 rounded-lg border px-3 py-2">
@@ -79,6 +80,7 @@
     import Badge from '@/components/ui/badge/Badge.vue'
     import Button from '@/components/ui/button/Button.vue'
     import { Switch } from '@/components/ui/switch'
+    import SeriesDeleteDialog from '@/components/SeriesDetail/SeriesDeleteDialog.vue'
     import StatusBadge from '@/components/StatusBadge.vue'
     import { getSeriesUiStatus, hasCodec } from '@/domain/series'
     import useSeriesStore from '@/stores/SeriesStore'
