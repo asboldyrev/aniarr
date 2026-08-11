@@ -23,6 +23,15 @@
                 <ExternalLink class="h-3 w-3" />
             </a>
         </div>
+
+        <div class="mt-3">
+            <RssFeedManageDialog
+                :feed="feed"
+                :season-id="seasonId"
+                :season-number="seasonNumber"
+                @changed="$emit('changed')"
+            />
+        </div>
     </div>
 </template>
 
@@ -30,11 +39,16 @@
     import { computed } from 'vue'
     import { ExternalLink } from '@lucide/vue'
     import Badge from '@/components/ui/badge/Badge.vue'
+    import RssFeedManageDialog from '@/components/SeriesDetail/RssFeedManageDialog.vue'
 
     const props = defineProps({
         feed: { type: Object, default: null },
         monitored: { type: Boolean, default: true },
+        seasonId: { type: Number, required: true },
+        seasonNumber: { type: Number, required: true },
     })
+
+    defineEmits(['changed'])
 
     const state = computed(() => {
         const feed = props.feed
