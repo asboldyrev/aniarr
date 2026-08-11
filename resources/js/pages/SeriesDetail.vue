@@ -21,6 +21,7 @@
                         v-for="season in sortedSeasons"
                         :key="season.id"
                         :season="season"
+                        :series-monitored="series.monitored"
                         @downloaded="refreshSeries"
                     />
                 </div>
