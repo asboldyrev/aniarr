@@ -48,6 +48,8 @@ final class RssFeedController extends Controller
         ];
 
         if ($urlChanged) {
+            $rssFeed->releases()->update(['is_current' => false]);
+
             $attributes = array_merge($attributes, [
                 'last_rss_hash' => null,
                 'last_rss_check' => null,
