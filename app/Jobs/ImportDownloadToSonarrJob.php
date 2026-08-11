@@ -24,11 +24,9 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     private const SONARR_COMMAND_TIMEOUT = 300;
-
     private const POLL_INTERVAL = 3;
 
     public int $tries = 5;
-
     public $timeout = 360;
 
     public function __construct(public int $downloadId) {}
@@ -57,7 +55,7 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
                     throw new RuntimeException('Torrent для импорта не найден в qBittorrent.');
                 }
 
-                $commandFiles = $this->buildImportFiles($download, $current, $sonarrClient);
+                $commandFiles = $this->buildImportFiles($download, $current, $sonarrClient, $logger);
                 if ($commandFiles === []) {
                     throw new RuntimeException('Нет файлов для ManualImport в Sonarr.');
                 }
@@ -102,7 +100,6 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
                     }
 
                     $details = $this->getSonarrCommandFailureDetails($commandResult);
-
                     throw new RuntimeException(
                         'ManualImport Sonarr завершился с ошибкой'.($details !== '' ? ': '.$details : '.'),
                     );
@@ -111,12 +108,7 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
                 $download->update(['imported_at' => now()]);
             }
 
-            $this->syncAndComplete(
-                $download,
-                $sonarrClient,
-                $syncAction,
-                $completeImportedDownload,
-            );
+            $this->syncAndComplete($download, $sonarrClient, $syncAction, $completeImportedDownload);
         } catch (Throwable $e) {
             $logger->exception($e, event: 'download.import_failed');
             throw $e;
@@ -143,6 +135,7 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
         Download $download,
         QBitTorrent $torrent,
         SonarrClient $sonarrClient,
+        AniarrLogger $logger,
     ): array {
         $seriesId = $download->season->series->sonarr_id;
         if (! $seriesId) {
@@ -153,18 +146,26 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
             ? $torrent->content_path
             : $torrent->save_path;
 
-        $candidates = $sonarrClient->getManualImportCandidates($folder, $seriesId);
+        $candidates = $sonarrClient->getManualImportCandidates($folder);
         if ($candidates === []) {
             throw new RuntimeException('Sonarr не вернул кандидатов ManualImport для папки '.$folder.'.');
         }
 
+        $candidatePaths = [];
         $candidatesByPath = [];
         foreach ($candidates as $candidate) {
             $path = $this->normalizePath((string) ($candidate['path'] ?? ''));
             if ($path !== '') {
+                $candidatePaths[] = $path;
                 $candidatesByPath[$path] = $candidate;
             }
         }
+
+        $logger->event('download.manual_import_candidates', '[Sonarr] Получены кандидаты ManualImport', LogType::INFO, [
+            'folder' => $folder,
+            'candidates_count' => count($candidates),
+            'candidate_paths' => array_slice($candidatePaths, 0, 20),
+        ]);
 
         $files = [];
         $savePath = rtrim($torrent->save_path, '/');
@@ -188,13 +189,11 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
             }
 
             $files[] = array_filter([
-                'path' => $path,
+                'path' => (string) ($candidate['path'] ?? $path),
                 'seriesId' => $seriesId,
                 'episodeIds' => [$episode->sonarr_id],
                 'quality' => $quality,
-                'languages' => is_array($candidate['languages'] ?? null)
-                    ? $candidate['languages']
-                    : [],
+                'languages' => is_array($candidate['languages'] ?? null) ? $candidate['languages'] : [],
                 'releaseGroup' => $candidate['releaseGroup'] ?? null,
                 'downloadId' => $candidate['downloadId'] ?? null,
                 'indexerFlags' => $candidate['indexerFlags'] ?? 0,
@@ -243,10 +242,7 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
 
         $syncAction->execute($series, $sonarrSeries, $sonarrClient);
 
-        $fresh = Download::query()
-            ->with(['release', 'items.episode'])
-            ->find($download->id);
-
+        $fresh = Download::query()->with(['release', 'items.episode'])->find($download->id);
         if ($fresh === null || $fresh->items->isEmpty()) {
             return false;
         }
@@ -314,9 +310,7 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
         }
 
         if ($download->imported_at !== null) {
-            $download->update([
-                'error_message' => $e?->getMessage(),
-            ]);
+            $download->update(['error_message' => $e?->getMessage()]);
 
             app(AniarrLogger::class)
                 ->forDownload($download)
@@ -328,9 +322,7 @@ final class ImportDownloadToSonarrJob implements ShouldQueue
                     ['error' => $e?->getMessage()],
                 );
 
-            SyncSeriesWithSonarrJob::dispatch($download->season->series_id)
-                ->onQueue('downloads');
-
+            SyncSeriesWithSonarrJob::dispatch($download->season->series_id)->onQueue('downloads');
             return;
         }
 
