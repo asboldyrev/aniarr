@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Actions\AddSeriesAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreSeriesRequest;
+use App\Http\Requests\UpdateSeriesMonitoringRequest;
 use App\Http\Resources\SeriesResource;
+use App\Jobs\SyncRssFeedJob;
 use App\Models\Series;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -62,5 +64,26 @@ final class SeriesController extends Controller
             new SeriesResource($series),
             $alreadyExists ? 200 : 201,
         );
+    }
+
+    public function updateMonitoring(
+        UpdateSeriesMonitoringRequest $request,
+        Series $series,
+    ): SeriesResource {
+        $monitored = $request->monitored();
+        $series->update(['monitored' => $monitored]);
+
+        if ($monitored) {
+            $series->seasons()
+                ->where('monitored', true)
+                ->whereHas('rssFeed', fn ($query) => $query->where('enabled', true))
+                ->with('rssFeed:id,season_id')
+                ->get()
+                ->pluck('rssFeed.id')
+                ->filter()
+                ->each(fn (int $rssFeedId) => SyncRssFeedJob::dispatch($rssFeedId));
+        }
+
+        return new SeriesResource($series->fresh());
     }
 }
