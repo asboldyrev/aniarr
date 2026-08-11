@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\AddSeriesAction;
+use App\Actions\DeleteSeriesAction;
+use App\Exceptions\CannotDeleteSeriesWithActiveDownload;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\DeleteSeriesRequest;
 use App\Http\Requests\StoreSeriesRequest;
 use App\Http\Requests\UpdateSeriesMonitoringRequest;
 use App\Http\Resources\SeriesResource;
@@ -11,6 +14,7 @@ use App\Jobs\SyncRssFeedJob;
 use App\Models\Series;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Symfony\Component\HttpFoundation\Response;
 
 final class SeriesController extends Controller
 {
@@ -85,5 +89,24 @@ final class SeriesController extends Controller
         }
 
         return new SeriesResource($series->fresh());
+    }
+
+    public function destroy(
+        DeleteSeriesRequest $request,
+        Series $series,
+        DeleteSeriesAction $deleteSeries,
+    ): Response|JsonResponse {
+        try {
+            $deleteSeries->execute(
+                $series,
+                deleteFromSonarr: $request->deleteFromSonarr(),
+            );
+        } catch (CannotDeleteSeriesWithActiveDownload $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 409);
+        }
+
+        return response()->noContent();
     }
 }
