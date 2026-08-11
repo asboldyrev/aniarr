@@ -3,7 +3,7 @@ import type { DropdownMenuSubTriggerProps } from 'reka-ui'
 
 import type { HTMLAttributes } from 'vue'
 import { reactiveOmit } from '@vueuse/core'
-import { RiArrowRightSLine } from '@remixicon/vue'
+import { ChevronRight } from '@lucide/vue'
 import {
   DropdownMenuSubTrigger,
   useForwardProps,
@@ -27,6 +27,6 @@ const forwardedProps = useForwardProps(delegatedProps)
     )"
   >
     <slot />
-    <RiArrowRightSLine class="cn-rtl-flip ml-auto" />
+    <ChevronRight class="cn-rtl-flip ml-auto h-4 w-4" />
   </DropdownMenuSubTrigger>
 </template>
