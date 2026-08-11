@@ -26,8 +26,8 @@
                         </div>
 
                         <div class="flex shrink-0 items-center gap-2">
-                            <Badge :variant="badgeVariant">{{ typeLabel }}</Badge>
-                            <Badge v-if="item.resolvedAt" variant="outline">Решено</Badge>
+                            <Badge variant="outline" :class="badgeClass">{{ typeLabel }}</Badge>
+                            <Badge v-if="item.resolvedAt" variant="outline" class="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">Решено</Badge>
                         </div>
                     </div>
 
@@ -106,38 +106,38 @@
         error: {
             label: 'Ошибка',
             icon: AlertCircle,
-            iconClass: 'bg-destructive/10 text-destructive',
-            badgeVariant: 'destructive',
+            iconClass: 'bg-red-500/10 text-red-600 dark:text-red-400',
+            badgeClass: 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300',
         },
         warning: {
             label: 'Предупреждение',
             icon: AlertTriangle,
             iconClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-            badgeVariant: 'secondary',
+            badgeClass: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
         },
         info: {
             label: 'Информация',
             icon: Info,
             iconClass: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-            badgeVariant: 'secondary',
+            badgeClass: 'border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300',
         },
         debug: {
             label: 'Отладка',
             icon: Bug,
             iconClass: 'bg-muted text-muted-foreground',
-            badgeVariant: 'outline',
+            badgeClass: 'border-slate-500/30 bg-slate-500/10 text-slate-600 dark:text-slate-300',
         },
     }[props.item.type] ?? {
         label: props.item.type ?? 'Событие',
         icon: Info,
         iconClass: 'bg-muted text-muted-foreground',
-        badgeVariant: 'outline',
+        badgeClass: 'border-slate-500/30 bg-slate-500/10 text-slate-600 dark:text-slate-300',
     }))
 
     const typeLabel = computed(() => config.value.label)
     const typeIcon = computed(() => config.value.icon)
     const iconClass = computed(() => config.value.iconClass)
-    const badgeVariant = computed(() => config.value.badgeVariant)
+    const badgeClass = computed(() => config.value.badgeClass)
 
     const sourceLabel = computed(() => {
         const source = String(props.item.source ?? '').toLowerCase()
