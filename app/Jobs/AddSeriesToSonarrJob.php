@@ -14,6 +14,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use RuntimeException;
+use Throwable;
 
 /**
  * Задача для добавления сериала в Sonarr.
@@ -38,32 +39,38 @@ final class AddSeriesToSonarrJob implements ShouldQueue
             ->forSeries($series)
             ->withSource('sonarr');
 
-        if (! $sonarrClient->testConnection()) {
-            throw new RuntimeException('Sonarr недоступен.');
+        try {
+            if (! $sonarrClient->testConnection()) {
+                throw new RuntimeException('Sonarr недоступен.');
+            }
+
+            // Между проверкой в AddSeriesAction и выполнением queued job сериал
+            // мог быть добавлен вручную или другим процессом.
+            $existingSeries = $sonarrClient->getSeriesByTvdbId($series->thetvdb_id);
+            $seriesInSonarr = $existingSeries ?? $this->addSeriesToSonarr($sonarrClient, $series);
+
+            if ($seriesInSonarr->id <= 0) {
+                throw new RuntimeException('Sonarr вернул некорректный ID после добавления сериала.');
+            }
+
+            $series->update(['sonarr_id' => $seriesInSonarr->id]);
+
+            $logger->event(
+                $existingSeries === null ? 'sonarr.series_added' : 'sonarr.series_available',
+                $existingSeries === null
+                    ? '[Sonarr] Сериал добавлен в Sonarr'
+                    : '[Sonarr] Сериал уже доступен в Sonarr',
+                LogType::INFO,
+                [
+                    'sonarr_id' => $seriesInSonarr->id,
+                    'thetvdb_id' => $series->thetvdb_id,
+                ],
+            );
+        } catch (Throwable $e) {
+            $logger->exception($e, event: 'sonarr.series_add_failed');
+
+            throw $e;
         }
-
-        // Между проверкой в AddSeriesAction и выполнением queued job сериал
-        // мог быть добавлен вручную или другим процессом.
-        $existingSeries = $sonarrClient->getSeriesByTvdbId($series->thetvdb_id);
-        $seriesInSonarr = $existingSeries ?? $this->addSeriesToSonarr($sonarrClient, $series);
-
-        if ($seriesInSonarr->id <= 0) {
-            throw new RuntimeException('Sonarr вернул некорректный ID после добавления сериала.');
-        }
-
-        $series->update(['sonarr_id' => $seriesInSonarr->id]);
-
-        $logger->event(
-            $existingSeries === null ? 'sonarr.series_added' : 'sonarr.series_available',
-            $existingSeries === null
-                ? '[Sonarr] Сериал добавлен в Sonarr'
-                : '[Sonarr] Сериал уже доступен в Sonarr',
-            LogType::INFO,
-            [
-                'sonarr_id' => $seriesInSonarr->id,
-                'thetvdb_id' => $series->thetvdb_id,
-            ],
-        );
     }
 
     private function addSeriesToSonarr(SonarrClient $sonarrClient, Series $series): SonarrSeries
