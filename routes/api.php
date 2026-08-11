@@ -19,6 +19,7 @@ Route::patch('/series/{series}/monitoring', [SeriesController::class, 'updateMon
 Route::delete('/series/{series}', [SeriesController::class, 'destroy']);
 
 // RSS
+Route::post('/seasons/{season}/rss-feed', [RssFeedController::class, 'store']);
 Route::patch('/rss-feeds/{rssFeed}', [RssFeedController::class, 'update']);
 Route::delete('/rss-feeds/{rssFeed}', [RssFeedController::class, 'destroy']);
 
