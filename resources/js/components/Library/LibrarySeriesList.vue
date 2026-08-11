@@ -213,6 +213,7 @@
         return {
             healthy: 'RSS активен',
             error: 'RSS ошибка',
+            paused: 'RSS приостановлен',
             disabled: 'RSS отключён',
             missing: 'Нет RSS',
         }[state] ?? state
