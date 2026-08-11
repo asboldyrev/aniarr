@@ -21,7 +21,7 @@ const router = createRouter({
         {
             path: '/downloads',
             name: 'downloads',
-            component: () => import('@/pages/ActiveDownloads.vue'),
+            component: () => import('@/pages/Downloads.vue'),
         },
         {
             path: '/activity',
