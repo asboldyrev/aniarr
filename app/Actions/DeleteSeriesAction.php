@@ -11,6 +11,10 @@ use Illuminate\Support\Facades\Storage;
 
 final class DeleteSeriesAction
 {
+    public function __construct(
+        private readonly SonarrClient $sonarrClient,
+    ) {}
+
     public function execute(Series $series, bool $deleteFromSonarr = false): void
     {
         $hasActiveDownload = $series->seasons()
@@ -22,15 +26,10 @@ final class DeleteSeriesAction
         }
 
         if ($deleteFromSonarr) {
-            $sonarrClient = new SonarrClient;
-            $sonarrSeriesId = $series->sonarr_id;
+            $sonarrSeries = $this->sonarrClient->getSeriesByTvdbId($series->thetvdb_id);
 
-            if ($sonarrSeriesId === null) {
-                $sonarrSeriesId = $sonarrClient->getSeriesByTvdbId($series->thetvdb_id)?->id;
-            }
-
-            if ($sonarrSeriesId !== null && $sonarrSeriesId > 0) {
-                $sonarrClient->deleteSeries($sonarrSeriesId, deleteFiles: true);
+            if ($sonarrSeries !== null && $sonarrSeries->id > 0) {
+                $this->sonarrClient->deleteSeries($sonarrSeries->id, deleteFiles: true);
             }
         }
 
