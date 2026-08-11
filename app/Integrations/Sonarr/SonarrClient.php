@@ -3,7 +3,6 @@
 namespace App\Integrations\Sonarr;
 
 use App\Integrations\BaseApiClient;
-use App\Integrations\Sonarr\Dto\importFile;
 use App\Integrations\Sonarr\Dto\RootFolder;
 use App\Integrations\Sonarr\Dto\SonarrEpisode;
 use App\Integrations\Sonarr\Dto\SonarrSeries;
@@ -18,17 +17,11 @@ class SonarrClient extends BaseApiClient
 {
     protected string $apiKey;
 
-    /**
-     * Проверяет, добавлен ли сериал в Sonarr по TVDB ID.
-     */
     public function hasSeries(int $tvdbId): bool
     {
         return $this->getSeriesByTvdbId($tvdbId) !== null;
     }
 
-    /**
-     * Получить уже добавленный в Sonarr сериал по TVDB ID.
-     */
     public function getSeriesByTvdbId(int $tvdbId): ?SonarrSeries
     {
         $response = $this->get('series', ['tvdbId' => $tvdbId]);
@@ -43,11 +36,6 @@ class SonarrClient extends BaseApiClient
         return is_array($series) ? SonarrSeries::makeFromResponse($series) : null;
     }
 
-    /**
-     * Найти сериал через Sonarr lookup по TVDB ID.
-     *
-     * Используется для получения данных перед добавлением сериала в Sonarr.
-     */
     public function findByTvdbId(int $tvdbId): ?SonarrSeries
     {
         $response = $this->get('series/lookup', ['term' => 'tvdb:'.$tvdbId]);
@@ -60,14 +48,6 @@ class SonarrClient extends BaseApiClient
         return null;
     }
 
-    /**
-     * Добавить сериал в Sonarr по данным lookup (rootFolderPath и qualityProfileId обязательны).
-     *
-     * @param  SonarrSeries  $lookupSeries  Данные сериала из поиска
-     * @param  string  $rootFolderPath  Путь к корневой папке
-     * @param  int  $qualityProfileId  ID профиля качества
-     * @return SonarrSeries|null Данные созданного сериала
-     */
     public function addSeriesFromLookup(SonarrSeries $lookupSeries, string $rootFolderPath, int $qualityProfileId): ?SonarrSeries
     {
         $payload = $lookupSeries->toArray();
@@ -87,24 +67,38 @@ class SonarrClient extends BaseApiClient
     }
 
     /**
-     * Команда ManualImport (POST /api/v3/command). Тело: name, importMode, files.
+     * Просит Sonarr самостоятельно разобрать файлы для ManualImport.
      *
-     * @param  array<importFile>  $files  Файлы для импорта
-     * @param  string  $importMode  Режим импорта (move, copy)
-     * @return array|null Ответ команды
+     * @return array<int, array<string, mixed>>
+     */
+    public function getManualImportCandidates(string $folder, int $seriesId): array
+    {
+        $response = $this->get('manualimport', [
+            'folder' => $folder,
+            'seriesId' => $seriesId,
+            'filterExistingFiles' => 'false',
+        ]);
+
+        $data = $response->json();
+
+        return is_array($data) ? $data : [];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $files
      */
     public function sendManualImportCommand(array $files, string $importMode = 'move'): ?array
     {
         if ($files === []) {
             return null;
         }
-        $body = [
+
+        $response = $this->post('command', [
             'name' => 'ManualImport',
             'importMode' => $importMode,
-            'files' => array_map(fn (importFile $item) => $item->toArray(), $files),
-        ];
+            'files' => $files,
+        ]);
 
-        $response = $this->post('command', $body);
         if (! $response->successful()) {
             app(AniarrLogger::class)->warning('[Sonarr] ошибка импорта', [
                 'status' => $response->status(),
@@ -118,12 +112,6 @@ class SonarrClient extends BaseApiClient
         return $response->json();
     }
 
-    /**
-     * Получить статус команды Sonarr (для опроса до completed/failed).
-     *
-     * @param  int  $commandId  ID команды Sonarr
-     * @return array|null Данные статуса команды
-     */
     public function getCommand(int $commandId): ?array
     {
         $response = $this->get("command/{$commandId}");
@@ -131,12 +119,7 @@ class SonarrClient extends BaseApiClient
         return $response->successful() ? $response->json() : null;
     }
 
-    /**
-     * Получить список эпизодов для сериала.
-     *
-     * @param  int  $seriesId  ID сериала в Sonarr
-     * @return array<SonarrEpisode> Список эпизодов
-     */
+    /** @return array<SonarrEpisode> */
     public function getEpisodes(int $seriesId): array
     {
         $response = $this->get('episode', ['seriesId' => $seriesId, 'includeEpisodeFile' => 'true']);
@@ -157,12 +140,6 @@ class SonarrClient extends BaseApiClient
         return array_map(fn ($episode) => SonarrEpisode::makeFromResponse($episode), $episodes);
     }
 
-    /**
-     * Найти серию по sonarr_id.
-     *
-     * @param  int  $sonarrId  ID эпизода в Sonarr
-     * @return array|null Данные эпизода
-     */
     public function findEpisodeBySonarrId(int $sonarrId): ?array
     {
         $response = $this->get('episode/'.$sonarrId);
@@ -170,11 +147,6 @@ class SonarrClient extends BaseApiClient
         return $response->successful() ? $response->json() : null;
     }
 
-    /**
-     * Проверить подключение к Sonarr.
-     *
-     * @return bool true, если подключение успешно
-     */
     public function testConnection(): bool
     {
         if (! $this->isConfigured()) {
@@ -190,11 +162,6 @@ class SonarrClient extends BaseApiClient
         }
     }
 
-    /**
-     * Получить профили качества Sonarr.
-     *
-     * @return array Профили качества
-     */
     public function getQualityProfiles(): array
     {
         $response = $this->get('qualityProfile');
@@ -203,11 +170,7 @@ class SonarrClient extends BaseApiClient
         return is_array($data) ? $data : [];
     }
 
-    /**
-     * Получить корневые папки Sonarr.
-     *
-     * @return array<RootFolder> Корневые папки
-     */
+    /** @return array<RootFolder> */
     public function getRootFolders(): array
     {
         $response = $this->get('rootFolder');
@@ -220,20 +183,12 @@ class SonarrClient extends BaseApiClient
         return [];
     }
 
-    /**
-     * Загрузить настройки Sonarr из базы данных.
-     */
     protected function loadSettings(): void
     {
         $this->baseUrl = Settings::get('sonarr_url', '').'/api/v3';
         $this->apiKey = Settings::get('sonarr_api_key', '');
     }
 
-    /**
-     * Получить заголовки для запросов.
-     *
-     * @return array<string, string>
-     */
     protected function getHeaders(): array
     {
         return [
