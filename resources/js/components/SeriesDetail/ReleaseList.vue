@@ -24,8 +24,23 @@
                             <div class="flex flex-wrap items-center gap-2">
                                 <Badge variant="outline" class="uppercase">{{ release.codec }}</Badge>
                                 <Badge v-if="release.quality" variant="outline">{{ release.quality }}</Badge>
-                                <Badge :variant="release.isCurrent ? 'secondary' : 'outline'">
-                                    {{ release.isCurrent ? 'Текущий' : 'История' }}
+
+                                <Badge v-if="release.isCurrent" variant="secondary">
+                                    Актуальный RSS
+                                </Badge>
+
+                                <Badge v-if="downloadState(release) === 'active'">
+                                    Загружается
+                                </Badge>
+                                <Badge v-else-if="downloadState(release) === 'completed'" variant="secondary">
+                                    Скачан
+                                </Badge>
+                                <Badge v-else-if="downloadState(release) === 'failed'" variant="destructive">
+                                    Ошибка загрузки
+                                </Badge>
+
+                                <Badge v-if="! release.isCurrent && downloadState(release) === null" variant="outline">
+                                    История
                                 </Badge>
                             </div>
 
@@ -64,9 +79,12 @@
     import Button from '@/components/ui/button/Button.vue'
     import ReleaseDownloadDialog from '@/components/SeriesDetail/ReleaseDownloadDialog.vue'
 
+    const ACTIVE_DOWNLOAD_STATUSES = new Set(['pending', 'preparing', 'downloading', 'importing'])
+
     const props = defineProps({
         releases: { type: Array, default: () => [] },
         episodes: { type: Array, default: () => [] },
+        downloads: { type: Array, default: () => [] },
         hasActiveDownload: { type: Boolean, default: false },
     })
 
@@ -74,10 +92,42 @@
 
     const open = ref(false)
 
+    const downloadsByRelease = computed(() => {
+        const map = new Map()
+
+        for (const download of props.downloads) {
+            const releaseId = Number(download.releaseId)
+            const current = map.get(releaseId)
+
+            if (! current || Number(download.id) > Number(current.id)) {
+                map.set(releaseId, download)
+            }
+        }
+
+        return map
+    })
+
     const sortedReleases = computed(() => [...props.releases].sort((left, right) => {
+        const leftState = downloadState(left)
+        const rightState = downloadState(right)
+
+        if (leftState === 'active' && rightState !== 'active') return -1
+        if (rightState === 'active' && leftState !== 'active') return 1
         if (left.isCurrent !== right.isCurrent) return left.isCurrent ? -1 : 1
+
         return new Date(right.publishedAt ?? 0) - new Date(left.publishedAt ?? 0)
     }))
+
+    function downloadState(release) {
+        const download = downloadsByRelease.value.get(Number(release.id))
+        if (! download) return null
+
+        if (ACTIVE_DOWNLOAD_STATUSES.has(download.status)) return 'active'
+        if (download.status === 'completed') return 'completed'
+        if (download.status === 'failed') return 'failed'
+
+        return null
+    }
 
     function formatDate(date) {
         return new Date(date).toLocaleDateString('ru-RU')
