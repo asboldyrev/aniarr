@@ -1,0 +1,92 @@
+<template>
+    <div class="rounded-lg border">
+        <button
+            type="button"
+            class="flex w-full items-center justify-between gap-3 p-4 text-left"
+            @click="open = ! open"
+        >
+            <div>
+                <p class="text-sm font-medium">Релизы</p>
+                <p class="mt-1 text-xs text-muted-foreground">{{ releases.length }} в истории RSS</p>
+            </div>
+            <ChevronDown class="h-4 w-4 transition-transform" :class="open ? 'rotate-180' : ''" />
+        </button>
+
+        <div v-if="open" class="border-t">
+            <div v-if="releases.length === 0" class="p-4 text-sm text-muted-foreground">
+                Релизы пока не найдены.
+            </div>
+
+            <div v-else class="divide-y">
+                <div v-for="release in sortedReleases" :key="release.id" class="p-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <Badge variant="outline" class="uppercase">{{ release.codec }}</Badge>
+                                <Badge v-if="release.quality" variant="outline">{{ release.quality }}</Badge>
+                                <Badge :variant="release.isCurrent ? 'secondary' : 'outline'">
+                                    {{ release.isCurrent ? 'Текущий' : 'История' }}
+                                </Badge>
+                            </div>
+
+                            <p class="mt-2 line-clamp-2 text-sm font-medium">{{ release.title }}</p>
+                            <p class="mt-1 text-xs text-muted-foreground">
+                                E{{ release.firstEpisode }}–E{{ release.lastEpisode }}
+                                <span v-if="release.publishedAt"> · {{ formatDate(release.publishedAt) }}</span>
+                                <span v-if="release.sizeBytes"> · {{ formatBytes(release.sizeBytes) }}</span>
+                            </p>
+                        </div>
+
+                        <div class="flex shrink-0 items-center gap-2">
+                            <Button v-if="release.torrentUrl" variant="outline" size="sm" as-child>
+                                <a :href="release.torrentUrl" target="_blank" rel="noopener noreferrer" aria-label="Открыть torrent">
+                                    <ExternalLink class="h-4 w-4" />
+                                </a>
+                            </Button>
+                            <ReleaseDownloadDialog
+                                :release="release"
+                                :episodes="episodes"
+                                :disabled="hasActiveDownload"
+                                @downloaded="$emit('downloaded')"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script setup>
+    import { computed, ref } from 'vue'
+    import { ChevronDown, ExternalLink } from '@lucide/vue'
+    import Badge from '@/components/ui/badge/Badge.vue'
+    import Button from '@/components/ui/button/Button.vue'
+    import ReleaseDownloadDialog from '@/components/SeriesDetail/ReleaseDownloadDialog.vue'
+
+    const props = defineProps({
+        releases: { type: Array, default: () => [] },
+        episodes: { type: Array, default: () => [] },
+        hasActiveDownload: { type: Boolean, default: false },
+    })
+
+    defineEmits(['downloaded'])
+
+    const open = ref(false)
+
+    const sortedReleases = computed(() => [...props.releases].sort((left, right) => {
+        if (left.isCurrent !== right.isCurrent) return left.isCurrent ? -1 : 1
+        return new Date(right.publishedAt ?? 0) - new Date(left.publishedAt ?? 0)
+    }))
+
+    function formatDate(date) {
+        return new Date(date).toLocaleDateString('ru-RU')
+    }
+
+    function formatBytes(bytes) {
+        const value = Number(bytes ?? 0)
+        if (value >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(1)} GB`
+        if (value >= 1024 ** 2) return `${(value / 1024 ** 2).toFixed(0)} MB`
+        return `${Math.round(value / 1024)} KB`
+    }
+</script>
