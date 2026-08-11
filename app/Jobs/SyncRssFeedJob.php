@@ -31,7 +31,12 @@ final class SyncRssFeedJob implements ShouldQueue
             ->with('season.series')
             ->find($this->rssFeedId);
 
-        if ($rssFeed === null || ! $rssFeed->enabled) {
+        if (
+            $rssFeed === null
+            || ! $rssFeed->enabled
+            || ! $rssFeed->season->monitored
+            || ! $rssFeed->season->series->monitored
+        ) {
             return;
         }
 
