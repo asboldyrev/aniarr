@@ -48,6 +48,7 @@
     const rssLabel = computed(() => ({
         healthy: 'Активен',
         error: 'Ошибка',
+        paused: 'Приостановлен',
         disabled: 'Отключён',
         missing: 'Нет RSS',
     }[getSeriesRssState(props.series)]))
