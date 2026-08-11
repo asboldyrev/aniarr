@@ -3,7 +3,9 @@
 namespace App\Actions\Downloads;
 
 use App\Enums\DownloadReason;
+use App\Enums\DownloadStatus;
 use App\Enums\DownloadTrigger;
+use App\Exceptions\ActiveDownloadExists;
 use App\Models\Download;
 use App\Models\Episode;
 use App\Models\Release;
@@ -15,6 +17,7 @@ final class ForceReleaseDownloadAction
 {
     public function __construct(
         private readonly CreateDownloadFromPlanAction $createDownload,
+        private readonly CleanupDownloadTorrentAction $cleanupTorrent,
     ) {}
 
     /**
@@ -28,6 +31,12 @@ final class ForceReleaseDownloadAction
         if ($season === null) {
             throw new InvalidArgumentException('Release не связан с сезоном.');
         }
+
+        if ($season->downloads()->whereIn('status', DownloadStatus::activeValues())->exists()) {
+            throw new ActiveDownloadExists($season->id);
+        }
+
+        $this->cleanupFailedAttempts($release);
 
         $coveredEpisodes = $season->episodes
             ->filter(fn (Episode $episode): bool => $episode->episode_number >= $release->first_episode
@@ -75,5 +84,22 @@ final class ForceReleaseDownloadAction
         }
 
         return $download;
+    }
+
+    private function cleanupFailedAttempts(Release $release): void
+    {
+        Download::query()
+            ->where('release_id', $release->id)
+            ->whereIn('status', [
+                DownloadStatus::FAILED->value,
+                DownloadStatus::CANCELLED->value,
+            ])
+            ->where(function ($query): void {
+                $query->whereNotNull('qbit_hash')
+                    ->orWhereNotNull('qbit_tag');
+            })
+            ->oldest('id')
+            ->get()
+            ->each(fn (Download $download) => $this->cleanupTorrent->execute($download));
     }
 }
