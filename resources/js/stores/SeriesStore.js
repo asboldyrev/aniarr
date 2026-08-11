@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { createSeries, getSeries, getSeriesList, updateSeriesMonitoring } from '@/api/series'
+import {
+    createSeries,
+    deleteSeries,
+    getSeries,
+    getSeriesList,
+    updateSeriesMonitoring,
+} from '@/api/series'
 
 export default defineStore('series', () => {
     const items = ref([])
@@ -21,6 +27,14 @@ export default defineStore('series', () => {
 
         if (current.value?.id === series.id) {
             current.value = series
+        }
+    }
+
+    function remove(id) {
+        items.value = items.value.filter((item) => item.id !== id)
+
+        if (current.value?.id === id) {
+            current.value = null
         }
     }
 
@@ -95,6 +109,18 @@ export default defineStore('series', () => {
         }
     }
 
+    async function destroy(id, deleteFromSonarr = false) {
+        error.value = null
+
+        try {
+            await deleteSeries(id, deleteFromSonarr)
+            remove(id)
+        } catch (exception) {
+            error.value = exception
+            throw exception
+        }
+    }
+
     return {
         items,
         current,
@@ -102,9 +128,11 @@ export default defineStore('series', () => {
         error,
         isEmpty,
         upsert,
+        remove,
         fetchAll,
         fetchOne,
         create,
         setMonitoring,
+        destroy,
     }
 })
