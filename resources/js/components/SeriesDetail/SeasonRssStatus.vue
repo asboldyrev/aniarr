@@ -5,7 +5,7 @@
                 <p class="text-sm font-medium">RSS</p>
                 <p class="mt-1 text-xs text-muted-foreground">{{ statusLabel }}</p>
             </div>
-            <Badge :variant="statusVariant">{{ shortLabel }}</Badge>
+            <Badge variant="outline" :class="statusClass">{{ shortLabel }}</Badge>
         </div>
 
         <div v-if="feed" class="mt-3 space-y-1 text-xs text-muted-foreground">
@@ -66,7 +66,13 @@
         missing: 'RSS-лента для сезона не настроена',
     }[state.value]))
 
-    const statusVariant = computed(() => state.value === 'error' ? 'destructive' : 'outline')
+    const statusClass = computed(() => ({
+        healthy: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+        error: 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300',
+        paused: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+        disabled: 'border-slate-500/30 bg-slate-500/10 text-slate-600 dark:text-slate-300',
+        missing: 'border-slate-500/30 bg-slate-500/10 text-slate-600 dark:text-slate-300',
+    }[state.value]))
 
     function formatDate(date) {
         if (! date) return '—'
