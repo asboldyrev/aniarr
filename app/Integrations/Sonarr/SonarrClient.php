@@ -66,6 +66,13 @@ class SonarrClient extends BaseApiClient
         return null;
     }
 
+    public function deleteSeries(int $seriesId, bool $deleteFiles = true): void
+    {
+        $this->delete("series/{$seriesId}", [
+            'deleteFiles' => $deleteFiles ? 'true' : 'false',
+        ]);
+    }
+
     /**
      * Просит Sonarr самостоятельно разобрать файлы из download-папки.
      *
