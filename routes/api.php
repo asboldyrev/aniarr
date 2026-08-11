@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\DownloadController;
 use App\Http\Controllers\Api\ReleaseDownloadController;
+use App\Http\Controllers\Api\RssFeedController;
 use App\Http\Controllers\Api\SeriesController;
 use App\Http\Controllers\Api\TvdbSeriesSearchController;
 use Illuminate\Support\Facades\Route;
@@ -15,6 +16,11 @@ Route::get('/series', [SeriesController::class, 'index']);
 Route::get('/series/{series}', [SeriesController::class, 'show']);
 Route::post('/series', [SeriesController::class, 'store']);
 Route::patch('/series/{series}/monitoring', [SeriesController::class, 'updateMonitoring']);
+Route::delete('/series/{series}', [SeriesController::class, 'destroy']);
+
+// RSS
+Route::patch('/rss-feeds/{rssFeed}', [RssFeedController::class, 'update']);
+Route::delete('/rss-feeds/{rssFeed}', [RssFeedController::class, 'destroy']);
 
 // Загрузки
 Route::get('/downloads', [DownloadController::class, 'index']);
