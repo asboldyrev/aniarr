@@ -23,9 +23,19 @@
 
                         <div class="mt-2 flex flex-wrap items-center gap-2">
                             <StatusBadge :status="download.status" show-icon />
-                            <Badge v-if="download.release?.codec" variant="secondary">{{ download.release.codec.toUpperCase() }}</Badge>
-                            <Badge variant="outline">{{ triggerLabel }}</Badge>
-                            <Badge v-for="reason in reasons" :key="reason" variant="outline">{{ reasonLabel(reason) }}</Badge>
+                            <Badge
+                                v-if="download.release?.codec"
+                                variant="outline"
+                                :class="download.release.codec === 'hevc'
+                                    ? 'border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300'
+                                    : 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300'"
+                            >
+                                {{ download.release.codec.toUpperCase() }}
+                            </Badge>
+                            <Badge variant="outline" :class="triggerClass">{{ triggerLabel }}</Badge>
+                            <Badge v-for="reason in reasons" :key="reason" variant="outline" :class="reasonClass(reason)">
+                                {{ reasonLabel(reason) }}
+                            </Badge>
                         </div>
                     </div>
                 </div>
@@ -126,6 +136,9 @@
     const hasDetails = computed(() => (props.download.items?.length ?? 0) > 0 || Boolean(props.download.qbitHash))
     const reasons = computed(() => [...new Set((props.download.items ?? []).map((item) => item.reason).filter(Boolean))])
     const triggerLabel = computed(() => props.download.trigger === 'manual' ? 'Ручной' : 'Автоматический')
+    const triggerClass = computed(() => props.download.trigger === 'manual'
+        ? 'border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300'
+        : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300')
     const activeLabel = computed(() => ({
         pending: 'Ожидание запуска',
         preparing: 'Подготовка torrent',
@@ -165,6 +178,14 @@
             upgrade: 'Upgrade',
             refresh: 'Повторная загрузка',
         }[reason] ?? reason
+    }
+
+    function reasonClass(reason) {
+        return {
+            missing: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+            upgrade: 'border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300',
+            refresh: 'border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300',
+        }[reason] ?? 'border-slate-500/30 bg-slate-500/10 text-slate-600 dark:text-slate-300'
     }
 
     function formatDate(value) {
