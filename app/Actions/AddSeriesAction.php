@@ -18,8 +18,12 @@ use Illuminate\Support\Facades\Bus;
  */
 final class AddSeriesAction
 {
-    public function execute(int|string $tvdbId, array $rssFeeds, ?Series $series = null): void
-    {
+    public function execute(
+        int|string $tvdbId,
+        array $rssFeeds,
+        ?Series $series = null,
+        bool $monitored = true,
+    ): void {
         $tvdbClient = new TvdbClient;
         $tvdbData = $tvdbClient->getSeries($tvdbId);
         $posterUrl = $tvdbClient->getPoster($tvdbId);
@@ -32,8 +36,11 @@ final class AddSeriesAction
                 'thetvdb_slug' => $tvdbData['slug'],
                 'poster_url' => $posterUrl,
                 'year' => $tvdbData['year'],
+                'monitored' => $monitored,
             ]);
         }
+
+        $series->update(['monitored' => $monitored]);
 
         $logger = app(AniarrLogger::class);
         $logger->setSeries($series->id);
