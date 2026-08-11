@@ -26,7 +26,7 @@
 
                             <div class="mt-3 flex flex-wrap items-center gap-2">
                                 <StatusBadge :status="status(item)" show-icon />
-                                <Badge v-if="codecState(item) !== 'none'" variant="outline">
+                                <Badge v-if="codecState(item) !== 'none'" variant="outline" :class="codecClass(codecState(item))">
                                     {{ codecLabel(codecState(item)) }}
                                 </Badge>
                                 <Badge variant="outline" :class="rssClass(rssState(item))">
@@ -115,7 +115,7 @@
                         </TableCell>
 
                         <TableCell>
-                            <Badge variant="outline" :class="codecState(item) === 'none' ? 'text-muted-foreground' : ''">
+                            <Badge variant="outline" :class="codecClass(codecState(item))">
                                 {{ codecLabel(codecState(item)) }}
                             </Badge>
                         </TableCell>
@@ -209,6 +209,15 @@
         }[codec] ?? codec
     }
 
+    function codecClass(codec) {
+        return {
+            hevc: 'border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300',
+            avc: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+            mixed: 'border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300',
+            none: 'border-slate-500/30 bg-slate-500/10 text-slate-600 dark:text-slate-300',
+        }[codec]
+    }
+
     function rssLabel(state) {
         return {
             healthy: 'RSS активен',
@@ -220,10 +229,13 @@
     }
 
     function rssClass(state) {
-        if (state === 'error') return 'border-destructive/40 text-destructive'
-        if (state === 'healthy') return 'text-foreground'
-
-        return 'text-muted-foreground'
+        return {
+            healthy: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+            error: 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300',
+            paused: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+            disabled: 'border-slate-500/30 bg-slate-500/10 text-slate-600 dark:text-slate-300',
+            missing: 'border-slate-500/30 bg-slate-500/10 text-slate-600 dark:text-slate-300',
+        }[state]
     }
 
     function activeStatusLabel(status) {
