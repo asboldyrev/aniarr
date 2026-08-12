@@ -9,16 +9,17 @@
                     </div>
 
                     <div class="min-w-0 flex-1">
-                        <div class="flex flex-wrap items-center gap-2">
+                        <div class="flex min-w-0 items-center gap-2">
                             <RouterLink
                                 v-if="download.series"
                                 :to="`/series/${download.series.id}`"
-                                class="truncate font-medium hover:underline"
+                                :title="download.series.title"
+                                class="min-w-0 flex-1 truncate font-medium hover:underline"
                             >
                                 {{ download.series.title }}
                             </RouterLink>
-                            <span v-else class="font-medium">Download #{{ download.id }}</span>
-                            <Badge variant="outline">S{{ String(download.season?.number ?? 0).padStart(2, '0') }}</Badge>
+                            <span v-else class="min-w-0 flex-1 truncate font-medium">Download #{{ download.id }}</span>
+                            <Badge variant="outline" class="shrink-0">S{{ String(download.season?.number ?? 0).padStart(2, '0') }}</Badge>
                         </div>
 
                         <div class="mt-2 flex flex-wrap items-center gap-2">
