@@ -26,7 +26,7 @@
                 <p v-if="meta.total !== undefined" class="text-sm text-muted-foreground">Всего: {{ meta.total }}</p>
             </div>
 
-            <DownloadsList v-if="items.length > 0" :downloads="items" />
+            <DownloadsList v-if="items.length > 0" :downloads="items" @changed="fetchItems" />
 
             <EmptyState
                 v-else
