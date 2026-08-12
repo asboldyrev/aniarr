@@ -44,6 +44,7 @@
     import RecentSeriesCard from '@/components/Dashboard/RecentSeriesCard.vue'
     import EmptyState from '@/components/EmptyState.vue'
     import { getActivity } from '@/api/activity'
+    import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
     import { getActiveDownload } from '@/domain/series'
     import useSeriesStore from '@/stores/SeriesStore'
 
@@ -86,6 +87,13 @@
             attentionCount.value = 0
         }
     }
+
+    useRealtimeRefresh(
+        () => seriesStore.fetchAll().catch(() => {}),
+        { resources: ['series', 'download'], delay: 400 },
+    )
+
+    useRealtimeRefresh(fetchAttention, { resources: ['activity'], delay: 250 })
 
     onMounted(() => {
         if (items.value.length === 0) {
