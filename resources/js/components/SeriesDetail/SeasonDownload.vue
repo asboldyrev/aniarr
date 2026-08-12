@@ -13,20 +13,28 @@
 
         <Progress :model-value="progress" class="mt-3 h-2" />
 
-        <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span v-if="download.etaSeconds !== null && download.etaSeconds !== undefined">ETA {{ formatEta(download.etaSeconds) }}</span>
-            <RouterLink to="/downloads" class="hover:text-foreground">Открыть загрузки</RouterLink>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+            <DownloadActions :download="download" @changed="$emit('changed')" />
+            <RouterLink to="/downloads" class="text-xs text-muted-foreground hover:text-foreground">
+                Открыть загрузки
+            </RouterLink>
+            <span v-if="download.etaSeconds !== null && download.etaSeconds !== undefined" class="text-xs text-muted-foreground">
+                ETA {{ formatEta(download.etaSeconds) }}
+            </span>
         </div>
     </div>
 </template>
 
 <script setup>
     import { computed } from 'vue'
+    import DownloadActions from '@/components/Downloads/DownloadActions.vue'
     import { Progress } from '@/components/ui/progress'
 
     const props = defineProps({
         download: { type: Object, default: null },
     })
+
+    defineEmits(['changed'])
 
     const progress = computed(() => Math.max(0, Math.min(100, Number(props.download?.progress ?? 0))))
 
