@@ -26,6 +26,8 @@ Route::delete('/rss-feeds/{rssFeed}', [RssFeedController::class, 'destroy']);
 // Загрузки
 Route::get('/downloads', [DownloadController::class, 'index']);
 Route::get('/downloads/{download}', [DownloadController::class, 'show']);
+Route::post('/downloads/{download}/cancel', [DownloadController::class, 'cancel']);
+Route::post('/downloads/{download}/retry', [DownloadController::class, 'retry']);
 
 // Релизы
 Route::post('/releases/{release}/download', [ReleaseDownloadController::class, 'store']);
