@@ -11,8 +11,12 @@
 
                         <div class="min-w-0 flex-1">
                             <div class="flex items-start justify-between gap-2">
-                                <div class="min-w-0">
-                                    <RouterLink :to="`/series/${item.id}`" class="block truncate font-medium hover:underline">
+                                <div class="min-w-0 flex-1">
+                                    <RouterLink
+                                        :to="`/series/${item.id}`"
+                                        :title="item.title"
+                                        class="block truncate font-medium hover:underline"
+                                    >
                                         {{ item.title }}
                                     </RouterLink>
                                     <p class="mt-0.5 text-xs text-muted-foreground">
@@ -62,7 +66,7 @@
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead class="w-[320px]">Сериал</TableHead>
+                        <TableHead class="w-[320px] max-w-[320px]">Сериал</TableHead>
                         <TableHead>Эпизоды</TableHead>
                         <TableHead>Статус</TableHead>
                         <TableHead>Формат</TableHead>
@@ -74,18 +78,22 @@
 
                 <TableBody>
                     <TableRow v-for="item in series" :key="item.id">
-                        <TableCell>
-                            <div class="flex min-w-0 items-center gap-3">
+                        <TableCell class="w-[320px] max-w-[320px]">
+                            <div class="flex w-full min-w-0 items-center gap-3">
                                 <div class="h-14 w-10 shrink-0 overflow-hidden rounded bg-muted">
                                     <img v-if="item.posterUrl" :src="item.posterUrl" :alt="item.title" class="h-full w-full object-cover" />
                                     <div v-else class="flex h-full w-full items-center justify-center text-xs text-muted-foreground">TV</div>
                                 </div>
 
-                                <div class="min-w-0">
-                                    <RouterLink :to="`/series/${item.id}`" class="block truncate font-medium hover:underline">
+                                <div class="min-w-0 flex-1 overflow-hidden">
+                                    <RouterLink
+                                        :to="`/series/${item.id}`"
+                                        :title="item.title"
+                                        class="block max-w-full truncate font-medium hover:underline"
+                                    >
                                         {{ item.title }}
                                     </RouterLink>
-                                    <p class="mt-0.5 text-xs text-muted-foreground">
+                                    <p class="mt-0.5 truncate text-xs text-muted-foreground">
                                         {{ item.year ?? 'Год неизвестен' }}
                                         <span v-if="lastEpisode(item)"> · {{ lastEpisode(item) }}</span>
                                     </p>
