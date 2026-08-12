@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use InvalidArgumentException;
+use RuntimeException;
 
 final class DownloadController extends Controller
 {
@@ -77,6 +78,8 @@ final class DownloadController extends Controller
             $cancelled = $cancelDownload->execute($download);
         } catch (InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 409);
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 502);
         }
 
         return new DownloadResource($cancelled->load($this->relations()));
