@@ -16,6 +16,16 @@
         <CardContent class="space-y-4 p-4 pt-0 sm:p-5 sm:pt-0">
             <slot />
 
+            <div
+                v-if="status?.message"
+                class="rounded-md border px-3 py-2 text-xs"
+                :class="status.connected
+                    ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300'
+                    : 'border-red-500/30 bg-red-500/5 text-red-700 dark:text-red-300'"
+            >
+                {{ status.message }}
+            </div>
+
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <p class="text-xs text-muted-foreground">
                     {{ dirty ? 'Сохраните изменения перед проверкой подключения.' : 'Проверка использует сохранённые значения.' }}
