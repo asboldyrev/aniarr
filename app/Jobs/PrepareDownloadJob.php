@@ -54,6 +54,10 @@ final class PrepareDownloadJob implements ShouldQueue
                 throw new RuntimeException('qBittorrent не вернул hash добавленного торрента.');
             }
 
+            if ($this->cancelledWhilePreparing($qBittorrentClient, $hash)) {
+                return;
+            }
+
             $download->update(['qbit_hash' => $hash]);
 
             $files = $this->waitForTorrentFiles($qBittorrentClient, $hash);
@@ -80,8 +84,19 @@ final class PrepareDownloadJob implements ShouldQueue
                 throw new RuntimeException('Не удалось отключить лишние файлы qBittorrent.');
             }
 
+            if ($this->cancelledWhilePreparing($qBittorrentClient, $hash)) {
+                return;
+            }
+
             if (! $qBittorrentClient->startTorrent($hash)) {
                 throw new RuntimeException('Не удалось запустить torrent в qBittorrent.');
+            }
+
+            $download->refresh();
+            if ($download->status === DownloadStatus::CANCELLED) {
+                $qBittorrentClient->deleteTorrent($hash);
+
+                return;
             }
 
             $download->update([
@@ -96,9 +111,26 @@ final class PrepareDownloadJob implements ShouldQueue
 
             WatchDownloadProgressJob::dispatch($download->id)->onQueue('downloads');
         } catch (Throwable $e) {
+            $fresh = Download::query()->find($this->downloadId);
+            if ($fresh?->status === DownloadStatus::CANCELLED) {
+                return;
+            }
+
             $logger->exception($e, event: 'download.prepare_failed');
             throw $e;
         }
+    }
+
+    private function cancelledWhilePreparing(QBittorrentClient $qBittorrentClient, string $hash): bool
+    {
+        $download = Download::query()->find($this->downloadId);
+        if ($download?->status !== DownloadStatus::CANCELLED) {
+            return false;
+        }
+
+        $qBittorrentClient->deleteTorrent($hash);
+
+        return true;
     }
 
     private function resolveTorrent(Download $download, QBittorrentClient $qBittorrentClient, string $tag): QBitTorrent
@@ -175,7 +207,7 @@ final class PrepareDownloadJob implements ShouldQueue
     public function failed(?Throwable $e): void
     {
         $download = Download::query()->with('season')->find($this->downloadId);
-        if ($download === null) {
+        if ($download === null || $download->status === DownloadStatus::CANCELLED) {
             return;
         }
 
