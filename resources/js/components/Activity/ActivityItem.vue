@@ -16,7 +16,7 @@
                                 <RouterLink
                                     v-if="item.series"
                                     :to="`/series/${item.series.id}`"
-                                    class="hover:text-foreground hover:underline"
+                                    class="min-w-0 max-w-full break-words hover:text-foreground hover:underline"
                                 >
                                     {{ item.series.title }}
                                 </RouterLink>
@@ -68,7 +68,7 @@
                 <DialogHeader>
                     <DialogTitle>Детали события</DialogTitle>
                     <DialogDescription>
-                        {{ item.event || item.source || 'Activity' }}
+                        {{ item.event || item.source || 'Событие Aniarr' }}
                     </DialogDescription>
                 </DialogHeader>
 
