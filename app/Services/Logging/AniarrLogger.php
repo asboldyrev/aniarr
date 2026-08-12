@@ -10,6 +10,7 @@ use App\Models\Season;
 use App\Models\Series;
 use Error;
 use Exception;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -196,26 +197,16 @@ final class AniarrLogger
             return;
         }
 
-        $formattedContext = $normalizedContext === []
-            ? ''
-            : json_encode(
-                $normalizedContext,
-                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT,
-            );
+        $logContext = array_filter([
+            'series_id' => $this->seriesId,
+            'season_id' => $this->seasonId,
+            'download_id' => $this->downloadId,
+            'source' => $this->source,
+            'event' => $event,
+            'context' => $normalizedContext === [] ? null : $normalizedContext,
+        ], static fn (mixed $value): bool => $value !== null);
 
-        $formatted = sprintf(
-            '[%s] %s: %s%s',
-            now()->format('Y-m-d H:i:s'),
-            $level->name,
-            $message,
-            $formattedContext ? "\n{$formattedContext}" : '',
-        );
-
-        file_put_contents(
-            storage_path('logs/aniarr.log'),
-            $formatted."\n",
-            FILE_APPEND | LOCK_EX,
-        );
+        Log::channel('aniarr')->log($level->value, $message, $logContext);
     }
 
     private function hasActivityScope(): bool
