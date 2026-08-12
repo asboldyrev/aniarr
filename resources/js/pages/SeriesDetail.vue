@@ -55,6 +55,7 @@
     import SeasonCard from '@/components/SeriesDetail/SeasonCard.vue'
     import SeriesHeader from '@/components/SeriesDetail/SeriesHeader.vue'
     import SeriesStats from '@/components/SeriesDetail/SeriesStats.vue'
+    import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
     import useSeriesStore from '@/stores/SeriesStore'
 
     const route = useRoute()
@@ -67,6 +68,12 @@
     async function refreshSeries() {
         await seriesStore.fetchOne(route.params.id).catch(() => {})
     }
+
+    useRealtimeRefresh(refreshSeries, {
+        resources: ['series', 'download'],
+        delay: 300,
+        predicate: (event) => Number(event.seriesId) === Number(route.params.id),
+    })
 
     watch(() => route.params.id, (id, previousId) => {
         if (id && id !== previousId) {
