@@ -30,7 +30,7 @@
 
     defineProps({
         id: { type: String, required: true },
-        modelValue: { type: [String, null], default: '' },
+        modelValue: { type: String, default: '' },
         placeholder: { type: String, default: '' },
     })
 
