@@ -53,6 +53,7 @@
     import DownloadsToolbar from '@/components/Downloads/DownloadsToolbar.vue'
     import EmptyState from '@/components/EmptyState.vue'
     import { getDownloads } from '@/api/downloads'
+    import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
 
     const items = ref([])
     const meta = ref({})
@@ -121,6 +122,8 @@
         currentPage.value = page
         fetchItems()
     }
+
+    useRealtimeRefresh(fetchItems, { resources: ['download'], delay: 300 })
 
     watch([statusFilter, triggerFilter], () => {
         currentPage.value = 1
