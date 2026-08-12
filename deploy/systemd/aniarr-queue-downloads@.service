@@ -1,0 +1,18 @@
+[Unit]
+Description=Aniarr downloads queue worker %i
+PartOf=aniarr.target
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/boldyreva/data/Projects/pet/aniarr
+Environment=DB_QUEUE_RETRY_AFTER=600
+ExecStart=/usr/bin/php8.5 artisan queue:work database --queue=downloads --sleep=1 --timeout=420 --max-time=3600
+Restart=always
+RestartSec=3
+TimeoutStopSec=600
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=aniarr.target
