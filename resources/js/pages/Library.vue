@@ -55,6 +55,7 @@
     import EmptyState from '@/components/EmptyState.vue'
     import LibrarySeriesList from '@/components/Library/LibrarySeriesList.vue'
     import LibraryToolbar from '@/components/Library/LibraryToolbar.vue'
+    import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
     import useSeriesStore from '@/stores/SeriesStore'
     import {
         getActiveDownload,
@@ -101,6 +102,11 @@
         statusFilter.value = 'all'
         codecFilter.value = 'all'
     }
+
+    useRealtimeRefresh(
+        () => seriesStore.fetchAll().catch(() => {}),
+        { resources: ['series', 'download'], delay: 400 },
+    )
 
     onMounted(() => {
         if (items.value.length === 0) {
