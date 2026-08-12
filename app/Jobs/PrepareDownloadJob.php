@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Enums\DownloadStatus;
 use App\Enums\LogType;
+use App\Events\RealtimeChanged;
 use App\Integrations\QBittorrent\Dto\File;
 use App\Integrations\QBittorrent\Dto\Torrent as QBitTorrent;
 use App\Integrations\QBittorrent\QBittorrentClient;
@@ -55,6 +56,7 @@ final class PrepareDownloadJob implements ShouldQueue
             }
 
             $download->refresh();
+            $this->broadcastChanged($download);
             $logger->event('download.preparing', '[QBittorrent] Подготовка загрузки', LogType::INFO);
 
             $tag = $download->qbit_tag ?: 'aniarr-download-'.$download->id;
@@ -119,6 +121,7 @@ final class PrepareDownloadJob implements ShouldQueue
             }
 
             $download->refresh();
+            $this->broadcastChanged($download);
 
             $logger->event('download.started', '[QBittorrent] Загрузка запущена', LogType::INFO, [
                 'hash' => $hash,
@@ -135,6 +138,18 @@ final class PrepareDownloadJob implements ShouldQueue
             $logger->exception($e, event: 'download.prepare_failed');
             throw $e;
         }
+    }
+
+    private function broadcastChanged(Download $download): void
+    {
+        event(new RealtimeChanged(
+            resource: 'download',
+            action: 'updated',
+            id: $download->id,
+            seriesId: $download->season?->series_id,
+            seasonId: $download->season_id,
+            downloadId: $download->id,
+        ));
     }
 
     private function cancelledWhilePreparing(QBittorrentClient $qBittorrentClient, string $hash): bool
