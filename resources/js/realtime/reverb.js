@@ -14,7 +14,7 @@ class AniarrRealtimeClient {
         const port = import.meta.env.VITE_REVERB_PORT
             || (scheme === 'https' ? '443' : '8080')
         const wsScheme = scheme === 'https' ? 'wss' : 'ws'
-        const url = `${wsScheme}://${host}:${port}/app/${encodeURIComponent(key)}?protocol=7&client=aniarr&version=1.0&flash=false`
+        const url = `${wsScheme}://${host}:${port}/app/${encodeURIComponent(key)}?protocol=7&client=js&version=8.4.0&flash=false`
 
         this.socket = new WebSocket(url)
 
