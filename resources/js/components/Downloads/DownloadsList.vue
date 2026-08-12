@@ -4,6 +4,7 @@
             v-for="download in downloads"
             :key="download.id"
             :download="download"
+            @changed="$emit('changed')"
         />
     </div>
 </template>
@@ -14,4 +15,6 @@
     defineProps({
         downloads: { type: Array, default: () => [] },
     })
+
+    defineEmits(['changed'])
 </script>
