@@ -13,16 +13,17 @@ export default defineStore('series', () => {
     const current = ref(null)
     const loading = ref(false)
     const error = ref(null)
+    const hasLoadedAll = ref(false)
 
-    const isEmpty = computed(() => ! loading.value && items.value.length === 0)
+    const isEmpty = computed(() => hasLoadedAll.value && ! loading.value && items.value.length === 0)
 
     function upsert(series) {
         const index = items.value.findIndex((item) => item.id === series.id)
 
-        if (index === -1) {
-            items.value.push(series)
-        } else {
+        if (index !== -1) {
             items.value[index] = series
+        } else if (hasLoadedAll.value) {
+            items.value.push(series)
         }
 
         if (current.value?.id === series.id) {
@@ -44,6 +45,7 @@ export default defineStore('series', () => {
 
         try {
             items.value = await getSeriesList()
+            hasLoadedAll.value = true
         } catch (exception) {
             error.value = exception
             throw exception
@@ -126,6 +128,7 @@ export default defineStore('series', () => {
         current,
         loading,
         error,
+        hasLoadedAll,
         isEmpty,
         upsert,
         remove,
