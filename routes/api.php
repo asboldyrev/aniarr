@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\DownloadController;
 use App\Http\Controllers\Api\ReleaseDownloadController;
 use App\Http\Controllers\Api\RssFeedController;
 use App\Http\Controllers\Api\SeriesController;
+use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\TvdbSeriesSearchController;
 use Illuminate\Support\Facades\Route;
 
@@ -28,6 +29,11 @@ Route::get('/downloads', [DownloadController::class, 'index']);
 Route::get('/downloads/{download}', [DownloadController::class, 'show']);
 Route::post('/downloads/{download}/cancel', [DownloadController::class, 'cancel']);
 Route::post('/downloads/{download}/retry', [DownloadController::class, 'retry']);
+
+// Настройки
+Route::get('/settings', [SettingsController::class, 'index']);
+Route::put('/settings', [SettingsController::class, 'update']);
+Route::post('/settings/test/{service}', [SettingsController::class, 'test']);
 
 // Релизы
 Route::post('/releases/{release}/download', [ReleaseDownloadController::class, 'store']);
