@@ -64,6 +64,7 @@
     import ActivityToolbar from '@/components/Activity/ActivityToolbar.vue'
     import EmptyState from '@/components/EmptyState.vue'
     import { getActivity, reopenActivity, resolveActivity } from '@/api/activity'
+    import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh'
 
     const items = ref([])
     const meta = ref({})
@@ -172,6 +173,8 @@
         currentPage.value = page
         fetchItems()
     }
+
+    useRealtimeRefresh(fetchItems, { resources: ['activity'], delay: 250 })
 
     watch([typeFilter, stateFilter, sourceFilter], () => {
         currentPage.value = 1
