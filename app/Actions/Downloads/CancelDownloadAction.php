@@ -4,17 +4,15 @@ namespace App\Actions\Downloads;
 
 use App\Enums\DownloadStatus;
 use App\Enums\LogType;
-use App\Integrations\QBittorrent\QBittorrentClient;
 use App\Models\Download;
 use App\Services\Logging\AniarrLogger;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
-use RuntimeException;
 
 final class CancelDownloadAction
 {
     public function __construct(
-        private readonly QBittorrentClient $qBittorrentClient,
+        private readonly CleanupDownloadTorrentAction $cleanupTorrent,
     ) {}
 
     public function execute(Download $download): Download
@@ -38,11 +36,7 @@ final class CancelDownloadAction
                 throw new InvalidArgumentException('Этот Download уже нельзя отменить.');
             }
 
-            if ($lockedDownload->qbit_hash) {
-                if (! $this->qBittorrentClient->deleteTorrent($lockedDownload->qbit_hash)) {
-                    throw new RuntimeException('Не удалось удалить torrent из qBittorrent. Download не отменён.');
-                }
-            }
+            $this->cleanupTorrent->execute($lockedDownload);
 
             $lockedDownload->update([
                 'status' => DownloadStatus::CANCELLED,
