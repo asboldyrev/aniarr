@@ -1,7 +1,7 @@
 <template>
     <div class="space-y-5 p-4 sm:space-y-6 sm:p-6">
         <div>
-            <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">Activity</h1>
+            <h1 class="text-2xl font-semibold tracking-tight sm:text-3xl">События</h1>
             <p class="mt-1 text-sm text-muted-foreground">События Aniarr, предупреждения и ошибки интеграций</p>
         </div>
 
@@ -17,7 +17,7 @@
         </div>
 
         <div v-else-if="error" class="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-            Не удалось загрузить Activity. Попробуйте обновить страницу.
+            Не удалось загрузить события. Попробуйте обновить страницу.
         </div>
 
         <template v-else>
@@ -93,7 +93,7 @@
 
     const emptyDescription = computed(() => stateFilter.value === 'unresolved'
         ? 'Нерешённых предупреждений и ошибок нет.'
-        : 'Попробуйте изменить фильтры Activity.')
+        : 'Попробуйте изменить фильтры событий.')
 
     function buildParams() {
         const params = {
