@@ -12,7 +12,7 @@
             @reset="resetFilters"
         />
 
-        <div v-if="seriesStore.loading && items.length === 0" class="flex min-h-64 items-center justify-center">
+        <div v-if="seriesStore.loading && ! seriesStore.hasLoadedAll" class="flex min-h-64 items-center justify-center">
             <RefreshCw class="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
 
@@ -109,7 +109,7 @@
     )
 
     onMounted(() => {
-        if (items.value.length === 0) {
+        if (! seriesStore.hasLoadedAll) {
             seriesStore.fetchAll().catch(() => {})
         }
     })
