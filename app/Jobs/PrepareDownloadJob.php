@@ -42,7 +42,19 @@ final class PrepareDownloadJob implements ShouldQueue
                 throw new RuntimeException('Не удалось подключиться к qBittorrent.');
             }
 
-            $download->update(['status' => DownloadStatus::PREPARING, 'error_message' => null]);
+            $claimed = Download::query()
+                ->whereKey($download->id)
+                ->whereIn('status', [DownloadStatus::PENDING->value, DownloadStatus::PREPARING->value])
+                ->update([
+                    'status' => DownloadStatus::PREPARING,
+                    'error_message' => null,
+                ]);
+
+            if ($claimed === 0) {
+                return;
+            }
+
+            $download->refresh();
             $logger->event('download.preparing', '[QBittorrent] Подготовка загрузки', LogType::INFO);
 
             $tag = $download->qbit_tag ?: 'aniarr-download-'.$download->id;
@@ -92,17 +104,21 @@ final class PrepareDownloadJob implements ShouldQueue
                 throw new RuntimeException('Не удалось запустить torrent в qBittorrent.');
             }
 
-            $download->refresh();
-            if ($download->status === DownloadStatus::CANCELLED) {
+            $started = Download::query()
+                ->whereKey($download->id)
+                ->where('status', DownloadStatus::PREPARING->value)
+                ->update([
+                    'status' => DownloadStatus::DOWNLOADING,
+                    'started_at' => $download->started_at ?? now(),
+                ]);
+
+            if ($started === 0) {
                 $qBittorrentClient->deleteTorrent($hash);
 
                 return;
             }
 
-            $download->update([
-                'status' => DownloadStatus::DOWNLOADING,
-                'started_at' => $download->started_at ?? now(),
-            ]);
+            $download->refresh();
 
             $logger->event('download.started', '[QBittorrent] Загрузка запущена', LogType::INFO, [
                 'hash' => $hash,
