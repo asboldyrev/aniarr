@@ -45,4 +45,29 @@ const router = createRouter({
     ],
 })
 
+const staleChunkReloadKey = 'aniarr:stale-chunk-reload'
+
+router.onError((error) => {
+    const message = String(error?.message ?? error)
+    const isStaleChunk = message.includes('Failed to fetch dynamically imported module')
+        || message.includes('Importing a module script failed')
+        || message.includes('error loading dynamically imported module')
+
+    if (! isStaleChunk) {
+        return
+    }
+
+    if (sessionStorage.getItem(staleChunkReloadKey) === '1') {
+        sessionStorage.removeItem(staleChunkReloadKey)
+        return
+    }
+
+    sessionStorage.setItem(staleChunkReloadKey, '1')
+    window.location.reload()
+})
+
+router.afterEach(() => {
+    sessionStorage.removeItem(staleChunkReloadKey)
+})
+
 export default router
