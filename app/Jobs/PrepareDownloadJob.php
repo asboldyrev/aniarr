@@ -113,7 +113,7 @@ final class PrepareDownloadJob implements ShouldQueue
                 ]);
 
             if ($started === 0) {
-                $qBittorrentClient->deleteTorrent($hash);
+                $this->cleanupCancelledTorrent($qBittorrentClient, $hash);
 
                 return;
             }
@@ -144,9 +144,22 @@ final class PrepareDownloadJob implements ShouldQueue
             return false;
         }
 
-        $qBittorrentClient->deleteTorrent($hash);
+        $this->cleanupCancelledTorrent($qBittorrentClient, $hash, $download->qbit_tag);
 
         return true;
+    }
+
+    private function cleanupCancelledTorrent(
+        QBittorrentClient $qBittorrentClient,
+        string $hash,
+        ?string $tag = null,
+    ): void {
+        $qBittorrentClient->deleteTorrent($hash);
+
+        $tag ??= Download::query()->whereKey($this->downloadId)->value('qbit_tag');
+        if ($tag) {
+            $qBittorrentClient->deleteTags($tag);
+        }
     }
 
     private function resolveTorrent(Download $download, QBittorrentClient $qBittorrentClient, string $tag): QBitTorrent
