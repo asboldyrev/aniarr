@@ -40,7 +40,8 @@
                     </div>
                 </div>
 
-                <div class="flex shrink-0 items-center gap-2">
+                <div class="flex shrink-0 flex-wrap items-center gap-2">
+                    <DownloadActions :download="download" @changed="$emit('changed')" />
                     <Button v-if="hasDetails" variant="outline" size="sm" @click="detailsOpen = true">
                         Детали
                     </Button>
@@ -122,11 +123,14 @@
     import { Card, CardContent } from '@/components/ui/card'
     import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
     import { Progress } from '@/components/ui/progress'
+    import DownloadActions from '@/components/Downloads/DownloadActions.vue'
     import StatusBadge from '@/components/StatusBadge.vue'
 
     const props = defineProps({
         download: { type: Object, required: true },
     })
+
+    defineEmits(['changed'])
 
     const detailsOpen = ref(false)
     const activeStatuses = new Set(['pending', 'preparing', 'downloading', 'importing'])
