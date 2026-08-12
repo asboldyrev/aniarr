@@ -44,6 +44,11 @@ final class WatchDownloadProgressJob implements ShouldBeUnique, ShouldQueue
 
             $current = $this->findCurrentTorrent($download, $qBittorrentClient);
             if ($current === null) {
+                $fresh = Download::query()->find($download->id);
+                if ($fresh?->status !== DownloadStatus::DOWNLOADING) {
+                    return;
+                }
+
                 $logger->event('download.torrent_missing', '[QBittorrent] Download не найден по hash/tag', LogType::WARNING, [
                     'hash' => $download->qbit_hash,
                 ]);
@@ -55,7 +60,10 @@ final class WatchDownloadProgressJob implements ShouldBeUnique, ShouldQueue
             $progress = (int) round(max(0, min(1, (float) $current->progress)) * 100);
             $eta = max(0, min(16_777_215, (int) $current->eta));
 
-            $download->update(['progress' => $progress, 'eta_seconds' => $eta]);
+            Download::query()
+                ->whereKey($download->id)
+                ->where('status', DownloadStatus::DOWNLOADING->value)
+                ->update(['progress' => $progress, 'eta_seconds' => $eta]);
 
             $isDone = $progress >= 100 || in_array(
                 $current->state,
@@ -64,22 +72,39 @@ final class WatchDownloadProgressJob implements ShouldBeUnique, ShouldQueue
             );
 
             if (! $isDone) {
+                $fresh = Download::query()->find($download->id);
+                if ($fresh?->status !== DownloadStatus::DOWNLOADING) {
+                    return;
+                }
+
                 $delay = (int) max(1, min(15, ceil(max(1, $eta) / 7200)));
                 $this->release($delay);
 
                 return;
             }
 
-            $download->update([
-                'status' => DownloadStatus::IMPORTING,
-                'progress' => 100,
-                'eta_seconds' => 0,
-            ]);
+            $importing = Download::query()
+                ->whereKey($download->id)
+                ->where('status', DownloadStatus::DOWNLOADING->value)
+                ->update([
+                    'status' => DownloadStatus::IMPORTING,
+                    'progress' => 100,
+                    'eta_seconds' => 0,
+                ]);
+
+            if ($importing === 0) {
+                return;
+            }
 
             $logger->event('download.downloaded', '[QBittorrent] Загрузка завершена', LogType::INFO);
 
             ImportDownloadToSonarrJob::dispatch($download->id)->onQueue('downloads');
         } catch (Throwable $e) {
+            $fresh = Download::query()->find($this->downloadId);
+            if ($fresh?->status === DownloadStatus::CANCELLED) {
+                return;
+            }
+
             $logger->exception($e, event: 'download.watch_failed');
             throw $e;
         }
