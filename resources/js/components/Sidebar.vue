@@ -71,7 +71,7 @@
         { to: '/', icon: LayoutDashboard, label: 'Обзор', exact: true },
         { to: '/library', icon: BookOpen, label: 'Библиотека' },
         { to: '/downloads', icon: Download, label: 'Загрузки' },
-        { to: '/activity', icon: Activity, label: 'Activity' },
+        { to: '/activity', icon: Activity, label: 'События' },
         { to: '/settings', icon: Settings, label: 'Настройки' },
     ]
 
