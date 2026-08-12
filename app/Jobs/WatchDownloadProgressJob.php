@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Enums\DownloadStatus;
 use App\Enums\LogType;
+use App\Events\RealtimeChanged;
 use App\Integrations\QBittorrent\Dto\Torrent as QBitTorrent;
 use App\Integrations\QBittorrent\QBittorrentClient;
 use App\Models\Download;
@@ -60,10 +61,16 @@ final class WatchDownloadProgressJob implements ShouldBeUnique, ShouldQueue
             $progress = (int) round(max(0, min(1, (float) $current->progress)) * 100);
             $eta = max(0, min(16_777_215, (int) $current->eta));
 
-            Download::query()
+            $updated = Download::query()
                 ->whereKey($download->id)
                 ->where('status', DownloadStatus::DOWNLOADING->value)
                 ->update(['progress' => $progress, 'eta_seconds' => $eta]);
+
+            if ($updated === 0) {
+                return;
+            }
+
+            $this->broadcastChanged($download);
 
             $isDone = $progress >= 100 || in_array(
                 $current->state,
@@ -96,6 +103,8 @@ final class WatchDownloadProgressJob implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
+            $this->broadcastChanged($download);
+
             $logger->event('download.downloaded', '[QBittorrent] Загрузка завершена', LogType::INFO);
 
             ImportDownloadToSonarrJob::dispatch($download->id)->onQueue('downloads');
@@ -108,6 +117,18 @@ final class WatchDownloadProgressJob implements ShouldBeUnique, ShouldQueue
             $logger->exception($e, event: 'download.watch_failed');
             throw $e;
         }
+    }
+
+    private function broadcastChanged(Download $download): void
+    {
+        event(new RealtimeChanged(
+            resource: 'download',
+            action: 'updated',
+            id: $download->id,
+            seriesId: $download->season?->series_id,
+            seasonId: $download->season_id,
+            downloadId: $download->id,
+        ));
     }
 
     private function findCurrentTorrent(Download $download, QBittorrentClient $qBittorrentClient): ?QBitTorrent
