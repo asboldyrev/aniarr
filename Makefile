@@ -47,7 +47,8 @@ systemd-install:
 		printf '\n=== Enabling systemd user linger (sudo required) ...\n'; \
 		sudo loginctl enable-linger boldyreva; \
 	fi
-	@systemctl --user enable --now '$(SYSTEMD_TARGET)'
+	@systemctl --user enable '$(SYSTEMD_TARGET)' >/dev/null
+	@systemctl --user restart '$(SYSTEMD_TARGET)'
 	@printf '\033[0;32mDONE\033[0m\n'
 
 systemd-uninstall:
