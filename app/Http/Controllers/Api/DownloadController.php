@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Downloads\CancelDownloadAction;
+use App\Actions\Downloads\RetryDownloadAction;
 use App\Enums\DownloadStatus;
 use App\Enums\DownloadTrigger;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DownloadResource;
 use App\Models\Download;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use InvalidArgumentException;
 
 final class DownloadController extends Controller
 {
@@ -65,6 +69,28 @@ final class DownloadController extends Controller
     public function show(Download $download): DownloadResource
     {
         return new DownloadResource($download->load($this->relations()));
+    }
+
+    public function cancel(Download $download, CancelDownloadAction $cancelDownload): DownloadResource|JsonResponse
+    {
+        try {
+            $cancelled = $cancelDownload->execute($download);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        }
+
+        return new DownloadResource($cancelled->load($this->relations()));
+    }
+
+    public function retry(Download $download, RetryDownloadAction $retryDownload): DownloadResource|JsonResponse
+    {
+        try {
+            $retry = $retryDownload->execute($download);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        }
+
+        return new DownloadResource($retry->load($this->relations()));
     }
 
     /** @return array<int, string> */
