@@ -38,7 +38,7 @@
                     :season-number="season.number"
                     @changed="$emit('changed')"
                 />
-                <SeasonDownload :download="season.activeDownload" />
+                <SeasonDownload :download="season.activeDownload" @changed="$emit('changed')" />
             </div>
 
             <EpisodeList :episodes="season.episodes ?? []" />
