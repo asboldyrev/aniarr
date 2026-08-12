@@ -1,0 +1,17 @@
+[Unit]
+Description=Aniarr Reverb server
+PartOf=aniarr.target
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/boldyreva/data/Projects/pet/aniarr
+ExecStart=/usr/bin/php8.5 artisan reverb:start
+Restart=always
+RestartSec=3
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=aniarr.target
