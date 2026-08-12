@@ -16,3 +16,15 @@ export async function getDownload(id) {
 
     return response.data?.data ?? response.data ?? null
 }
+
+export async function cancelDownload(id) {
+    const response = await apiClient.post(`/downloads/${id}/cancel`)
+
+    return response.data?.data ?? response.data ?? null
+}
+
+export async function retryDownload(id) {
+    const response = await apiClient.post(`/downloads/${id}/retry`)
+
+    return response.data?.data ?? response.data ?? null
+}
