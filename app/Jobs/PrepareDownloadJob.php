@@ -43,16 +43,18 @@ final class PrepareDownloadJob implements ShouldQueue
                 throw new RuntimeException('Не удалось подключиться к qBittorrent.');
             }
 
-            $claimed = Download::query()
-                ->whereKey($download->id)
-                ->whereIn('status', [DownloadStatus::PENDING->value, DownloadStatus::PREPARING->value])
-                ->update([
-                    'status' => DownloadStatus::PREPARING,
-                    'error_message' => null,
-                ]);
+            if ($download->status === DownloadStatus::PENDING) {
+                $claimed = Download::query()
+                    ->whereKey($download->id)
+                    ->where('status', DownloadStatus::PENDING->value)
+                    ->update([
+                        'status' => DownloadStatus::PREPARING,
+                        'error_message' => null,
+                    ]);
 
-            if ($claimed === 0) {
-                return;
+                if ($claimed === 0) {
+                    return;
+                }
             }
 
             $download->refresh();
