@@ -66,11 +66,9 @@ final class WatchDownloadProgressJob implements ShouldBeUnique, ShouldQueue
                 ->where('status', DownloadStatus::DOWNLOADING->value)
                 ->update(['progress' => $progress, 'eta_seconds' => $eta]);
 
-            if ($updated === 0) {
-                return;
+            if ($updated > 0) {
+                $this->broadcastChanged($download);
             }
-
-            $this->broadcastChanged($download);
 
             $isDone = $progress >= 100 || in_array(
                 $current->state,
