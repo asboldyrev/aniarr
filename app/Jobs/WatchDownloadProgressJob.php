@@ -82,8 +82,7 @@ final class WatchDownloadProgressJob implements ShouldBeUnique, ShouldQueue
                     return;
                 }
 
-                $delay = (int) max(1, min(15, ceil(max(1, $eta) / 7200)));
-                $this->release($delay);
+                $this->release($this->pollDelay($current, $eta));
 
                 return;
             }
@@ -115,6 +114,22 @@ final class WatchDownloadProgressJob implements ShouldBeUnique, ShouldQueue
             $logger->exception($e, event: 'download.watch_failed');
             throw $e;
         }
+    }
+
+    private function pollDelay(QBitTorrent $torrent, int $eta): int
+    {
+        if (in_array($torrent->state, ['stalledDL', 'queuedDL', 'checkingDL', 'checkingResumeData'], true)) {
+            return 120;
+        }
+
+        if (in_array($torrent->state, ['stoppedDL', 'stoppedDl'], true)) {
+            return 60;
+        }
+
+        // Keep roughly 60 progress checks until the estimated completion time.
+        // qBittorrent uses very large ETA values when the estimate is unknown;
+        // the upper bound keeps such downloads from consuming queue attempts too quickly.
+        return (int) max(3, min(120, ceil(max(1, $eta) / 60)));
     }
 
     private function broadcastChanged(Download $download): void
