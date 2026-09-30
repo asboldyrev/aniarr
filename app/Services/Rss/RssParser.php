@@ -2,156 +2,121 @@
 
 namespace App\Services\Rss;
 
-use App\Actions\Torrents\SaveTorrent;
-use App\Models\Series;
-use App\Models\Torrent;
-use App\Services\Logging\AniarrLogger;
 use App\Services\Rss\Dto\FeedItem;
 use App\Services\Rss\Dto\FeedItems;
 use App\Services\Rss\Dto\FeedTitle;
-use Exception;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
+use RuntimeException;
+use SimpleXMLElement;
 
 /**
- * Сервис парсинга RSS-лент торрент-трекеров, извлечения метаданных и сохранения торрентов.
+ * Парсит RSS-ленту и преобразует её элементы в DTO без побочных эффектов.
  */
-class RssParser
+final class RssParser
 {
-    /**
-     * Парсинг RSS-ленты и извлечение информации из торрента
-     *
-     * @param  string  $url  URL RSS ленты
-     * @return FeedItems Распарсенные данные
-     */
     public function parseFeed(string $url): FeedItems
     {
+        $response = Http::timeout(30)->get($url);
+
         try {
-            $response = Http::timeout(30)->get($url);
-
-            if ($response->failed()) {
-                app(AniarrLogger::class)->error('[RSS] Запрос завершился ошибкой: ' . $response->status());
-
-                return new FeedItems([]);
-            }
-
-            $xml = simplexml_load_string($response->body(), 'SimpleXMLElement', LIBXML_NOCDATA);
-
-            if ($xml === false) {
-                app(AniarrLogger::class)->error('[RSS] Ошибка парсинга ленты: ' . $response->status());
-
-                return new FeedItems([]);
-            }
-
-            $items = [];
-            foreach ($xml->channel->item as $item) {
-                $parsed = $this->parseItem($item);
-                if ($parsed) {
-                    $items[] = $parsed;
-                }
-            }
-
-            return new FeedItems(items: $items);
-        } catch (Exception $e) {
-            app(AniarrLogger::class)->exception($e);
-
-            return new FeedItems([]);
-        }
-    }
-
-    /**
-     * Сохраняет торрент в БД
-     *
-     * @deprecated
-     */
-    public function saveTorrent(Series $series, FeedItem $item): ?Torrent
-    {
-        return app(SaveTorrent::class)->execute($series, $item);
-    }
-
-    /**
-     * Парсинг отдельного RSS-элемента
-     */
-    protected function parseItem($item): ?FeedItem
-    {
-        try {
-            $title = (string) $item->title;
-            $guid = (string) $item->guid;
-            $pubDate = (string) $item->pubDate;
-            $torrentId = (int) $item->torrentId ?? null;
-            $releaseId = (int) $item->releaseId ?? null;
-
-            // Parse enclosure (torrent file)
-            $enclosure = $item->enclosure;
-            $torrentUrl = (string) $enclosure['url'];
-            $size = (int) ($enclosure['length'] ?? 0);
-
-            // Parse title for metadata
-            // Format: "Название | WEBRip 1080p | HEVC | 1-12"
-            $metadata = $this->parseTitle($title);
-
-            if (! $metadata) {
-                return null;
-            }
-
-            return new FeedItem(
-                $metadata->title,
-                $guid,
-                $torrentUrl,
-                $torrentId,
-                $releaseId,
-                $pubDate,
-                $size,
-                $metadata->codec,
-                $metadata->episodes,
-                $metadata->quality,
+            $response->throw();
+        } catch (RequestException $e) {
+            throw new RuntimeException(
+                "RSS request failed with status {$response->status()}",
+                previous: $e,
             );
-        } catch (Exception $e) {
-            app(AniarrLogger::class)->exception($e);
-
-            return null;
         }
+
+        $xml = simplexml_load_string($response->body(), SimpleXMLElement::class, LIBXML_NOCDATA);
+
+        if ($xml === false || ! isset($xml->channel)) {
+            throw new RuntimeException('Unable to parse RSS feed XML.');
+        }
+
+        $items = [];
+
+        foreach ($xml->channel->item as $item) {
+            $parsed = $this->parseItem($item);
+
+            if ($parsed !== null) {
+                $items[] = $parsed;
+            }
+        }
+
+        return new FeedItems($items);
     }
 
-    /**
-     * Парсит заголовок и разбивает достаёт метаданные
-     *
-     * Формат: "Название | WEBRip 1080p | HEVC | 1-12"
-     */
-    protected function parseTitle(string $title): ?FeedTitle
+    private function parseItem(SimpleXMLElement $item): ?FeedItem
     {
-        // Remove CDATA wrapper if present
-        $title = trim($title);
-        $data = explode(' | ', $title);
+        $title = trim((string) $item->title);
+        $guid = trim((string) $item->guid);
+        $pubDate = trim((string) $item->pubDate);
+        $torrentId = trim((string) $item->torrentId);
+        $releaseId = trim((string) $item->releaseId);
 
-        if (count($data) != 4) {
+        $enclosure = $item->enclosure;
+        $torrentUrl = trim((string) ($enclosure['url'] ?? ''));
+        $size = (int) ($enclosure['length'] ?? 0);
+
+        if ($guid === '' || $torrentUrl === '') {
             return null;
         }
 
-        $codec = trim($data[2]);
-
-        if (! $codec) {
+        $metadata = $this->parseTitle($title);
+        if ($metadata === null) {
             return null;
         }
 
-        $range = explode('-', $data[3]);
-        $episodes = range($range[0], $range[1]);
+        return new FeedItem(
+            title: $metadata->title,
+            guid: $guid,
+            torrentUrl: $torrentUrl,
+            torrentId: $torrentId !== '' ? (int) $torrentId : null,
+            releaseId: $releaseId !== '' ? (int) $releaseId : null,
+            pubDate: $pubDate,
+            size: $size,
+            codec: strtolower($metadata->codec),
+            episodes: $metadata->episodes,
+            quality: $metadata->quality,
+        );
+    }
 
-        if (empty($episodes)) {
+    private function parseTitle(string $title): ?FeedTitle
+    {
+        $parts = explode(' | ', trim($title));
+        if (count($parts) !== 4) {
             return null;
         }
 
-        // Extract quality
-        $quality = '1080p';
-        if (stripos($data[1], '720p') !== false) {
-            $quality = '720p';
-        } elseif (stripos($data[1], '1080p') !== false) {
-            $quality = '1080p';
-        } elseif (stripos($data[1], '2160p') !== false || stripos($data[1], '4K') !== false) {
-            $quality = '2160p';
+        $codec = strtoupper(trim($parts[2]));
+        if (! in_array($codec, ['AVC', 'HEVC'], true)) {
+            return null;
         }
 
-        $title = $data[0];
+        $range = trim($parts[3]);
+        if (preg_match('/^(\d+)(?:-(\d+))?$/', $range, $matches) !== 1) {
+            return null;
+        }
 
-        return new FeedTitle($title, $codec, $episodes, $quality);
+        $firstEpisode = (int) $matches[1];
+        $lastEpisode = isset($matches[2]) ? (int) $matches[2] : $firstEpisode;
+
+        if ($firstEpisode <= 0 || $lastEpisode < $firstEpisode) {
+            return null;
+        }
+
+        $quality = match (true) {
+            stripos($parts[1], '2160p') !== false, stripos($parts[1], '4K') !== false => '2160p',
+            stripos($parts[1], '720p') !== false => '720p',
+            default => '1080p',
+        };
+
+        return new FeedTitle(
+            trim($parts[0]),
+            $codec,
+            range($firstEpisode, $lastEpisode),
+            $quality,
+        );
     }
 }

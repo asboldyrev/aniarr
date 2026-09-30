@@ -6,60 +6,65 @@
 </template>
 
 <script setup>
-    import { Clock, Bell, RefreshCw, Download, CheckCircle, AlertCircle } from '@lucide/vue';
-
-    import Badge from './ui/badge/Badge.vue';
-    import { ref } from 'vue';
+    import { computed } from 'vue'
+    import { Clock, RefreshCw, Download, CheckCircle, AlertCircle, PauseCircle } from '@lucide/vue'
+    import Badge from './ui/badge/Badge.vue'
 
     const props = defineProps({
-        status: String,
-        showIcon: Boolean
+        status: {
+            type: String,
+            required: true,
+        },
+        showIcon: Boolean,
     })
 
     const STATUS_CONFIG = {
-        waiting: {
-            label: 'Ожидание',
+        monitoring: {
+            label: 'Мониторинг',
             color: 'bg-blue-500',
-            icon: Clock
+            icon: Clock,
         },
-        new_episodes: {
-            label: 'Новые серии',
-            color: 'bg-yellow-500',
-            icon: Bell
+        unmonitored: {
+            label: 'Отключён',
+            color: 'bg-slate-500',
+            icon: PauseCircle,
         },
-        downloading_avc: {
-            label: 'Загрузка AVC',
-            color: 'bg-orange-500',
-            icon: Download
-        },
-        processing_sonarr: {
-            label: 'Обработка Sonarr',
+        pending: {
+            label: 'В очереди',
             color: 'bg-amber-500',
-            icon: RefreshCw
+            icon: Clock,
         },
-        downloading_hevc: {
-            label: 'Загрузка HEVC',
-            color: 'bg-orange-600',
-            icon: Download
+        preparing: {
+            label: 'Подготовка',
+            color: 'bg-amber-500',
+            icon: RefreshCw,
         },
-        syncing_jellyfin: {
-            label: 'Синхронизация Jellyfin',
+        downloading: {
+            label: 'Загрузка',
+            color: 'bg-orange-500',
+            icon: Download,
+        },
+        importing: {
+            label: 'Импорт',
             color: 'bg-purple-500',
-            icon: RefreshCw
+            icon: RefreshCw,
         },
-        done: {
-            label: 'Готово',
+        completed: {
+            label: 'Завершено',
             color: 'bg-green-500',
-            icon: CheckCircle
+            icon: CheckCircle,
         },
-        error: {
+        cancelled: {
+            label: 'Отменено',
+            color: 'bg-slate-500',
+            icon: PauseCircle,
+        },
+        failed: {
             label: 'Ошибка',
             color: 'bg-red-500',
-            icon: AlertCircle
+            icon: AlertCircle,
         },
     }
 
-    const activeStatus = ref(STATUS_CONFIG[props.status])
+    const activeStatus = computed(() => STATUS_CONFIG[props.status] ?? STATUS_CONFIG.monitoring)
 </script>
-
-<style lang="scss" scoped></style>

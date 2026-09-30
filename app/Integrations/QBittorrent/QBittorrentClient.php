@@ -27,7 +27,7 @@ class QBittorrentClient extends BaseApiClient
      */
     public function login(): bool
     {
-        $response = Http::asForm()->post(rtrim($this->baseUrl, '/') . '/api/v2/auth/login', [
+        $response = Http::asForm()->post(rtrim($this->baseUrl, '/').'/api/v2/auth/login', [
             'username' => $this->credentials['username'],
             'password' => $this->credentials['password'],
         ]);
@@ -37,7 +37,7 @@ class QBittorrentClient extends BaseApiClient
             if ($cookies) {
                 // Извлекаем SID из кук
                 if (preg_match('/SID=([^;]+)/', $cookies, $matches)) {
-                    $this->cookie = 'SID=' . $matches[1];
+                    $this->cookie = 'SID='.$matches[1];
 
                     return true;
                 }
@@ -83,7 +83,7 @@ class QBittorrentClient extends BaseApiClient
 
         $response = Http::withHeaders($this->getHeaders())
             ->asForm()
-            ->post(rtrim($this->baseUrl, '/') . '/api/v2/torrents/add', $params);
+            ->post(rtrim($this->baseUrl, '/').'/api/v2/torrents/add', $params);
 
         return $response->successful();
     }
@@ -240,7 +240,7 @@ class QBittorrentClient extends BaseApiClient
             return [];
         }
 
-        return array_map(fn($file) => File::makeFromResponse($file), $response);
+        return array_map(fn ($file) => File::makeFromResponse($file), $response);
     }
 
     /**
@@ -254,7 +254,7 @@ class QBittorrentClient extends BaseApiClient
         $response = $this->get('/api/v2/torrents/info', ['tag' => $tag]);
 
         if ($response->successful()) {
-            return array_map(fn($torrent) => Torrent::makeFromResponse($torrent), $response->json());
+            return array_map(fn ($torrent) => Torrent::makeFromResponse($torrent), $response->json());
         }
 
         return [];
@@ -318,7 +318,7 @@ class QBittorrentClient extends BaseApiClient
             throw new BaseUrlNotConfigured('Base URL для QBittorrent не настроен');
         }
 
-        $url = rtrim($this->baseUrl, '/') . '/' . ltrim($endpoint, '/');
+        $url = rtrim($this->baseUrl, '/').'/'.ltrim($endpoint, '/');
 
         $timeout = $options['timeout'] ?? 10;
         unset($options['timeout']);

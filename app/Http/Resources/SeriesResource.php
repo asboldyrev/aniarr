@@ -3,18 +3,18 @@
 namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class SeriesResource extends JsonResource
+final class SeriesResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray(Request $request): array
     {
+        $this->resource->loadMissing([
+            'seasons.rssFeed',
+            'seasons.episodes',
+            'seasons.downloads.release',
+        ]);
+
         return [
             'id' => $this->id,
             'title' => $this->title,
@@ -24,32 +24,14 @@ class SeriesResource extends JsonResource
                 ? asset('storage/'.$this->poster_path)
                 : $this->poster_url,
             'year' => $this->year,
-            'status' => $this->status,
-            'progress' => $this->progress,
-            'eta' => $this->eta,
-            'hasAvc' => $this->has_avc,
-            'hasHevc' => $this->has_hevc,
-            'lastEpisodes' => $this->last_episodes,
-            'lastUpdated' => $this->last_updated?->toIso8601String(),
-            'errorMessage' => $this->error_message,
-            'sonarrConnected' => $this->sonarr_connected,
-            'rssFeeds' => $this->rssFeeds->map(function ($feed) {
-                return [
-                    'id' => $feed->id,
-                    'seasonNumber' => $feed->season_number,
-                    'rssUrl' => $feed->rss_url,
-                    'lastRssHash' => $feed->last_rss_hash,
-                    'lastRssCheck' => $feed->last_rss_check?->toIso8601String(),
-                ];
-            }),
+            'monitored' => $this->monitored,
+            'sonarrId' => $this->sonarr_id,
+            'lastSonarrSyncAt' => $this->last_sonarr_sync_at?->toIso8601String(),
+            'createdAt' => $this->created_at?->toIso8601String(),
+            'updatedAt' => $this->updated_at?->toIso8601String(),
+            'seasons' => SeasonResource::collection(
+                $this->seasons->sortBy('number')->values(),
+            ),
         ];
-    }
-
-    /**
-     * Преобразовать коллекцию в массив
-     */
-    public static function collection($resource): AnonymousResourceCollection
-    {
-        return parent::collection($resource);
     }
 }

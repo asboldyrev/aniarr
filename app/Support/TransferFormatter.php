@@ -7,14 +7,14 @@ final class TransferFormatter
     public static function speed(int $bytesPerSecond): string
     {
         if ($bytesPerSecond >= 1024 ** 2) {
-            return round($bytesPerSecond / 1024 ** 2, 1) . ' MB/s';
+            return round($bytesPerSecond / 1024 ** 2, 1).' MB/s';
         }
 
         if ($bytesPerSecond >= 1024) {
-            return round($bytesPerSecond / 1024, 1) . ' KB/s';
+            return round($bytesPerSecond / 1024, 1).' KB/s';
         }
 
-        return $bytesPerSecond . ' B/s';
+        return $bytesPerSecond.' B/s';
     }
 
     public static function eta(int $seconds): ?string

@@ -1,0 +1,8 @@
+[Unit]
+Description=Aniarr background services
+Wants=aniarr-queue-default@1.service aniarr-queue-default@2.service
+Wants=aniarr-queue-downloads@1.service aniarr-queue-downloads@2.service
+Wants=aniarr-reverb.service
+
+[Install]
+WantedBy=default.target

@@ -2,19 +2,15 @@
 
 namespace App\Jobs;
 
+use App\Actions\Downloads\CompleteImportedDownloadAction;
 use App\Actions\SyncSeriesStateFromSonarrAction;
-use App\Enums\Status;
-use App\Events\SeriesUpdated;
-use App\Integrations\JellyfinClient;
-use App\Integrations\QBittorrent\Dto\File;
-use App\Integrations\Sonarr\Dto\importFile;
-use App\Integrations\Sonarr\Dto\SonarrEpisode;
-use App\Integrations\Sonarr\Dto\SonarrSeries;
+use App\Enums\DownloadStatus;
+use App\Enums\LogType;
+use App\Integrations\QBittorrent\Dto\Torrent as QBitTorrent;
+use App\Integrations\QBittorrent\QBittorrentClient;
 use App\Integrations\Sonarr\SonarrClient;
-use App\Models\Series;
-use App\Models\Torrent;
+use App\Models\Download;
 use App\Services\Logging\AniarrLogger;
-use App\Services\SeriesStatsBroadcaster;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -23,256 +19,392 @@ use Illuminate\Queue\SerializesModels;
 use RuntimeException;
 use Throwable;
 
-/**
- * Импорт в Sonarr (move), ожидание завершения команды,
- * затем Jellyfin rescan и синхронизация состояния. После успешного импорта запускает удаление торрента.
- *
- * Сначала получаем из Sonarr данные по пути (GET manualimport с seriesId), формируем тело команды ManualImport
- * (path, seriesId, seasonNumber, episodeIds, quality, languages, indexerFlags, releaseType) и отправляем
- * POST /api/v3/command. Если подходящих файлов нет — fallback на DownloadedEpisodesScan.
- */
-class ImportDownloadToSonarrJob implements ShouldQueue
+final class ImportDownloadToSonarrJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /** Максимум ожидания завершения команды Sonarr (секунды) */
     private const SONARR_COMMAND_TIMEOUT = 300;
-
-    public $timeout = 360;
-
-    /** Интервал опроса статуса (секунды) */
+    private const MANUAL_IMPORT_READY_TIMEOUT = 30;
     private const POLL_INTERVAL = 3;
 
-    /**
-     * Create a new job instance.
-     *
-     * @param  int  $torrentId  Идентификатор сериала
-     * @param  array  $files  Список метаданных загруженных файлов
-     */
-    public function __construct(
-        public int $torrentId,
-        public array $files,
-    ) {}
+    public int $tries = 5;
+    public $timeout = 360;
 
-    /**
-     * Execute the job.
-     *
-     * @param  SonarrClient  $sonarrClient  Экземпляр клиента Sonarr
-     * @param  JellyfinClient  $jellyfinClient  Экземпляр клиента Jellyfin
-     */
-    public function handle(SonarrClient $sonarrClient, JellyfinClient $jellyfinClient): void
-    {
-        $torrent = Torrent::query()
-            ->with('series')
-            ->where('id', $this->torrentId)
-            ->first();
-        if (! $torrent) {
+    public function __construct(public int $downloadId) {}
+
+    public function handle(
+        SonarrClient $sonarrClient,
+        QBittorrentClient $qBittorrentClient,
+        SyncSeriesStateFromSonarrAction $syncAction,
+        CompleteImportedDownloadAction $completeImportedDownload,
+    ): void {
+        $download = Download::query()->with(['season.series', 'release', 'items.episode'])->find($this->downloadId);
+        if ($download === null || $download->status !== DownloadStatus::IMPORTING) {
             return;
         }
 
-        $logger = app(AniarrLogger::class);
-        $path = $torrent->active_download_path;
-
-        $logger->debug('[Torrent] Джоба стартовала', [
-            'active_torrent_hash' => $torrent->active_torrent_hash,
-            'active_download_path_raw' => $path,
-            'path_is_empty' => $path === null || $path === '',
-        ]);
-
-        $torrent->series->update([
-            'status' => Status::PROCESSING_SONARR,
-            'last_updated' => now(),
-        ]);
-        broadcast(new SeriesUpdated($torrent->series->fresh()))->toOthers();
+        $logger = app(AniarrLogger::class)->forDownload($download)->withSource('sonarr');
 
         try {
-            $sonarrOk = $sonarrClient->testConnection();
-            $logger->debug('[Sonarr] Перед вызовом Sonarr API', [
-                'sonarr_test_connection' => $sonarrOk,
-                'files_count' => count($this->files),
-            ]);
-
-            if (! $sonarrOk) {
-                $logger->error('[Sonarr] Sonarr не подключен');
-                throw new RuntimeException('Sonarr не подключен');
+            if (! $sonarrClient->testConnection()) {
+                throw new RuntimeException('Sonarr недоступен.');
             }
 
-            $this->parseEpisodesFromFiles();
-            $command = $this->tryManualImportCommand($sonarrClient, $torrent);
-
-            if (empty($command)) {
-                $logger->error('[Sonarr] Sonarr не вернул command id');
-                throw new RuntimeException('Sonarr не вернул command id (нет файлов с эпизодами)');
-            }
-
-            $commandStatus = $this->waitForSonarrCommand($sonarrClient, (int) $command['id']);
-
-            if ($commandStatus === 'failed') {
-                throw new RuntimeException('Команда Sonarr завершилась с ошибкой');
-            }
-
-            if ($commandStatus === 'timeout') {
-                throw new RuntimeException('Таймаут ожидания команды Sonarr');
-            }
-
-            $sonarrSeries = $sonarrClient->findByTvdbId($torrent->series->thetvdb_id);
-            if ($sonarrSeries !== null) {
-                (new SyncSeriesStateFromSonarrAction)->execute($torrent->series, $sonarrSeries, $sonarrClient);
-            }
-
-            if ($jellyfinClient->testConnection()) {
-                $torrent->update([
-                    'status' => Status::SYNCING_JELLYFIN,
-                    'last_updated' => now(),
-                ]);
-                broadcast(new SeriesUpdated($torrent->series))->toOthers();
-                $jellyfinOk = $jellyfinClient->refreshLibrary();
-                if ($jellyfinOk) {
-                    $logger->info('[Jellyfin] Запустилась синхронизация');
+            if ($download->imported_at === null) {
+                $current = $this->findCurrentTorrent($download, $qBittorrentClient);
+                if ($current === null) {
+                    throw new RuntimeException('Torrent для импорта не найден в qBittorrent.');
                 }
+
+                $commandFiles = $this->buildImportFiles($download, $current, $sonarrClient, $logger);
+                if ($commandFiles === []) {
+                    throw new RuntimeException('Нет файлов для ManualImport в Sonarr.');
+                }
+
+                $logger->event('download.importing', '[Sonarr] Импорт Download запущен', LogType::INFO, [
+                    'files_count' => count($commandFiles),
+                ]);
+
+                $command = $sonarrClient->sendManualImportCommand($commandFiles, 'move');
+                $commandId = (int) ($command['id'] ?? 0);
+                if ($commandId <= 0) {
+                    throw new RuntimeException('Sonarr не вернул command id для ManualImport.');
+                }
+
+                $commandResult = $this->waitForSonarrCommand($sonarrClient, $commandId);
+                if ($commandResult === null) {
+                    throw new RuntimeException('Таймаут ожидания ManualImport Sonarr.');
+                }
+
+                $status = (string) ($commandResult['status'] ?? '');
+                if ($status !== 'completed') {
+                    $logger->event(
+                        'download.import_command_failed',
+                        '[Sonarr] ManualImport завершился с ошибкой',
+                        LogType::ERROR,
+                        [
+                            'command_id' => $commandId,
+                            'status' => $status,
+                            'message' => $commandResult['message'] ?? null,
+                            'body' => $commandResult['body'] ?? null,
+                            'result' => $commandResult['result'] ?? null,
+                        ],
+                    );
+
+                    if ($this->completeIfSonarrAlreadyImported(
+                        $download,
+                        $sonarrClient,
+                        $syncAction,
+                        $completeImportedDownload,
+                    )) {
+                        return;
+                    }
+
+                    $details = $this->getSonarrCommandFailureDetails($commandResult);
+                    throw new RuntimeException(
+                        'ManualImport Sonarr завершился с ошибкой'.($details !== '' ? ': '.$details : '.'),
+                    );
+                }
+
+                $download->update(['imported_at' => now()]);
             }
 
-            // После успешного импорта в Sonarr и синхронизации с Jellyfin запускаем удаление торрента
-            DeleteTorrentFromQBitJob::dispatch($this->torrentId)->onQueue('downloads');
-
-            $logger->info('[Sonarr] Импорт успешно завершен, запущено удаление торрента');
+            $this->syncAndComplete($download, $sonarrClient, $syncAction, $completeImportedDownload);
         } catch (Throwable $e) {
-            $logger->exception($e);
-            $torrent->series->update([
-                'status' => Status::ERROR,
-                'error_message' => 'Import: ' . $e->getMessage(),
-                'last_updated' => now(),
-            ]);
-            broadcast(new SeriesUpdated($torrent->series))->toOthers();
-            SeriesStatsBroadcaster::broadcast();
+            $logger->exception($e, event: 'download.import_failed');
             throw $e;
         }
     }
 
-    /**
-     * Получаем из Sonarr список файлов по пути (GET manualimport), формируем тело команды ManualImport
-     * и отправляем POST /api/v3/command. Возвращает ответ команды (с id) или null.
-     *
-     * @param  SonarrClient  $sonarrClient  Экземпляр клиента Sonarr
-     * @param  Torrent  $torrent  Модель сериала
-     * @return array|null Ответ команды с ID или null при ошибке
-     */
-    private function tryManualImportCommand(
-        SonarrClient $sonarrClient,
-        Torrent $torrent,
-    ): ?array {
-        /** @var SonarrSeries $sonarrSeries */
-        $sonarrSeries = $sonarrClient->findByTvdbId($torrent->series->thetvdb_id);
-        $sonarEpisodes = $sonarrClient->getEpisodes($sonarrSeries->id);
-
-        $commandFiles = [];
-
-        /** @var SonarrEpisode $episode */
-        foreach ($sonarEpisodes as $episode) {
-            $file = collect($this->files)
-                ->filter(
-                    fn(File $file) => $torrent->season_number === $episode->seasonNumber &&
-                        $file->episodeNumber === $episode->episodeNumber
-                )
-                ->first() ?? [];
-
-            if (empty($file)) {
-                continue;
-            }
-
-            $commandFiles[] = new importFile(
-                $file->path,
-                $sonarrSeries->id,
-                $episode->seasonNumber,
-                $episode->id,
-            );
-        }
-
-        if (empty($commandFiles)) {
-            app(AniarrLogger::class)->warning('[Sonarr] Нет файлов с эпизодами, fallback на scan');
-
+    private function findCurrentTorrent(Download $download, QBittorrentClient $qBittorrentClient): ?QBitTorrent
+    {
+        if (! $qBittorrentClient->login()) {
             return null;
         }
 
-        $command = $sonarrClient->sendManualImportCommand($commandFiles, 'move');
+        foreach ($qBittorrentClient->getTorrentsByTag($download->qbit_tag ?? '') as $torrent) {
+            if ($torrent->hash === $download->qbit_hash) {
+                return $torrent;
+            }
+        }
 
-        app(AniarrLogger::class)->debug('[Sonarr] Ответ Sonarr ManualImport', [
-            'command_id' => $command['id'] ?? null,
-            'files_count' => count($commandFiles),
+        return null;
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function buildImportFiles(
+        Download $download,
+        QBitTorrent $torrent,
+        SonarrClient $sonarrClient,
+        AniarrLogger $logger,
+    ): array {
+        $seriesId = $download->season->series->sonarr_id;
+        if (! $seriesId) {
+            throw new RuntimeException('У Series отсутствует sonarr_id.');
+        }
+
+        $folder = $torrent->content_path !== ''
+            ? $torrent->content_path
+            : $torrent->save_path;
+        $savePath = rtrim($torrent->save_path, '/');
+
+        $expectedPaths = [];
+        foreach ($download->items as $item) {
+            if (! $item->episode->sonarr_id || ! $item->torrent_file_name) {
+                continue;
+            }
+
+            $path = $savePath.'/'.ltrim($item->torrent_file_name, '/');
+            $expectedPaths[$this->normalizePath($path)] = $path;
+        }
+
+        if ($expectedPaths === []) {
+            return [];
+        }
+
+        $candidates = $this->waitForManualImportCandidates(
+            $sonarrClient,
+            $folder,
+            array_keys($expectedPaths),
+        );
+
+        $candidatePaths = [];
+        $candidatesByPath = [];
+        foreach ($candidates as $candidate) {
+            $path = $this->normalizePath((string) ($candidate['path'] ?? ''));
+            if ($path !== '') {
+                $candidatePaths[] = $path;
+                $candidatesByPath[$path] = $candidate;
+            }
+        }
+
+        $missingPaths = array_values(array_diff(array_keys($expectedPaths), array_keys($candidatesByPath)));
+        if ($missingPaths !== []) {
+            throw new RuntimeException(
+                'Sonarr не увидел все файлы для ManualImport за '.self::MANUAL_IMPORT_READY_TIMEOUT.' сек. Отсутствуют: '
+                .implode(', ', array_map(fn (string $path): string => $expectedPaths[$path] ?? $path, $missingPaths)),
+            );
+        }
+
+        $logger->event('download.manual_import_candidates', '[Sonarr] Файлы готовы к ManualImport', LogType::INFO, [
+            'folder' => $folder,
+            'expected_files_count' => count($expectedPaths),
+            'candidates_count' => count($candidates),
+            'candidate_paths' => array_slice($candidatePaths, 0, 20),
         ]);
 
-        return $command;
+        $files = [];
+
+        foreach ($download->items as $item) {
+            $episode = $item->episode;
+            if (! $episode->sonarr_id || ! $item->torrent_file_name) {
+                continue;
+            }
+
+            $path = $savePath.'/'.ltrim($item->torrent_file_name, '/');
+            $candidate = $candidatesByPath[$this->normalizePath($path)] ?? null;
+
+            if ($candidate === null) {
+                throw new RuntimeException('Sonarr не распознал файл для ManualImport: '.$path);
+            }
+
+            $quality = $candidate['quality'] ?? null;
+            if (! is_array($quality)) {
+                throw new RuntimeException('Sonarr не определил качество файла: '.$path);
+            }
+
+            $files[] = array_filter([
+                'path' => (string) ($candidate['path'] ?? $path),
+                'seriesId' => $seriesId,
+                'episodeIds' => [$episode->sonarr_id],
+                'quality' => $quality,
+                'languages' => is_array($candidate['languages'] ?? null) ? $candidate['languages'] : [],
+                'releaseGroup' => $candidate['releaseGroup'] ?? null,
+                'downloadId' => $candidate['downloadId'] ?? null,
+                'indexerFlags' => $candidate['indexerFlags'] ?? 0,
+                'releaseType' => $candidate['releaseType'] ?? 'unknown',
+            ], static fn (mixed $value): bool => $value !== null);
+        }
+
+        return $files;
     }
 
     /**
-     * Ожидание завершения команды Sonarr до завершения или таймаута.
-     * Возвращает статус команды: 'completed', 'failed' или 'timeout'.
-     *
-     * @param  SonarrClient  $sonarrClient  Экземпляр клиента Sonarr
-     * @param  int  $commandId  ID команды Sonarr
-     * @return string Статус команды: 'completed', 'failed' или 'timeout'
+     * @param  array<int, string>  $expectedPaths
+     * @return array<int, array<string, mixed>>
      */
-    private function waitForSonarrCommand(SonarrClient $sonarrClient, int $commandId): string
+    private function waitForManualImportCandidates(
+        SonarrClient $sonarrClient,
+        string $folder,
+        array $expectedPaths,
+    ): array {
+        $deadline = time() + self::MANUAL_IMPORT_READY_TIMEOUT;
+        $lastCandidates = [];
+
+        do {
+            $lastCandidates = $sonarrClient->getManualImportCandidates($folder);
+
+            $visiblePaths = [];
+            foreach ($lastCandidates as $candidate) {
+                $path = $this->normalizePath((string) ($candidate['path'] ?? ''));
+                if ($path !== '') {
+                    $visiblePaths[$path] = true;
+                }
+            }
+
+            $allExpectedFilesVisible = true;
+            foreach ($expectedPaths as $expectedPath) {
+                if (! isset($visiblePaths[$expectedPath])) {
+                    $allExpectedFilesVisible = false;
+                    break;
+                }
+            }
+
+            if ($allExpectedFilesVisible) {
+                return $lastCandidates;
+            }
+
+            if (time() < $deadline) {
+                sleep(self::POLL_INTERVAL);
+            }
+        } while (time() < $deadline);
+
+        return $lastCandidates;
+    }
+
+    private function normalizePath(string $path): string
+    {
+        return rtrim(str_replace('\\', '/', $path), '/');
+    }
+
+    private function syncAndComplete(
+        Download $download,
+        SonarrClient $sonarrClient,
+        SyncSeriesStateFromSonarrAction $syncAction,
+        CompleteImportedDownloadAction $completeImportedDownload,
+    ): void {
+        $series = $download->season->series;
+        $sonarrSeries = $sonarrClient->getSeriesByTvdbId($series->thetvdb_id);
+        if ($sonarrSeries === null) {
+            throw new RuntimeException('Сериал не найден среди добавленных сериалов Sonarr после импорта.');
+        }
+
+        $syncAction->execute($series, $sonarrSeries, $sonarrClient);
+
+        if (! $completeImportedDownload->execute($download)) {
+            throw new RuntimeException('Sonarr ещё не подтвердил импортированные файлы Download.');
+        }
+    }
+
+    private function completeIfSonarrAlreadyImported(
+        Download $download,
+        SonarrClient $sonarrClient,
+        SyncSeriesStateFromSonarrAction $syncAction,
+        CompleteImportedDownloadAction $completeImportedDownload,
+    ): bool {
+        $series = $download->season->series;
+        $sonarrSeries = $sonarrClient->getSeriesByTvdbId($series->thetvdb_id);
+        if ($sonarrSeries === null) {
+            return false;
+        }
+
+        $syncAction->execute($series, $sonarrSeries, $sonarrClient);
+
+        $fresh = Download::query()->with(['release', 'items.episode'])->find($download->id);
+        if ($fresh === null || $fresh->items->isEmpty()) {
+            return false;
+        }
+
+        foreach ($fresh->items as $item) {
+            if (! $item->episode->has_file || $item->episode->file_codec !== $fresh->release->codec) {
+                return false;
+            }
+        }
+
+        $fresh->update(['imported_at' => now()]);
+
+        return $completeImportedDownload->execute($fresh);
+    }
+
+    /** @return array<string, mixed>|null */
+    private function waitForSonarrCommand(SonarrClient $sonarrClient, int $commandId): ?array
     {
         $deadline = time() + self::SONARR_COMMAND_TIMEOUT;
-        $pollCount = 0;
+
         while (time() < $deadline) {
             sleep(self::POLL_INTERVAL);
-            $pollCount++;
-            $cmd = $sonarrClient->getCommand($commandId);
-            if ($cmd === null) {
-                app(AniarrLogger::class)->debug('[Sonarr] Poll command: getCommand вернул null', [
-                    'command_id' => $commandId,
-                    'poll' => $pollCount,
-                ]);
-
+            $command = $sonarrClient->getCommand($commandId);
+            if ($command === null) {
                 continue;
             }
-            $status = $cmd['status'] ?? '';
-            if ($pollCount <= 2 || $status === 'completed' || $status === 'failed') {
-                app(AniarrLogger::class)->info('[Sonarr] Статус команды Sonarr', [
-                    'command_id' => $commandId,
-                    'status' => $status,
-                    'poll' => $pollCount,
-                    'body' => $cmd['body'] ?? null,
-                ]);
-            }
 
-            if ($status === 'completed' || $status === 'failed') {
-                $method = $status === 'completed' ? 'info' : 'error';
-                app(AniarrLogger::class)->{$method}('[Sonarr] Команда Sonarr завершена', [
-                    'command_id' => $commandId,
-                    'status' => $status,
-                    'full_command_response' => $cmd,
-                ]);
-
-                return $status;
+            $status = (string) ($command['status'] ?? '');
+            if (in_array($status, ['completed', 'failed'], true)) {
+                return $command;
             }
         }
-        app(AniarrLogger::class)->warning('[Sonarr] Таймаут ожидания команды Sonarr', [
-            'command_id' => $commandId,
-            'polls' => $pollCount,
-        ]);
 
-        return 'timeout';
+        return null;
     }
 
-    /**
-     * Извлекает номера эпизодов из путей файлов и добавляет их в метаданные файлов.
-     */
-    private function parseEpisodesFromFiles(): void
+    /** @param array<string, mixed> $command */
+    private function getSonarrCommandFailureDetails(array $command): string
     {
-        /** @var File $file */
-        foreach ($this->files as &$file) {
-            preg_match('/\[(\d{2})\]/', $file->path, $matches);
-            if (! isset($matches[1])) {
-                continue;
-            }
-
-            $episodeNumber = (int) $matches[1];
-            if ($episodeNumber > 0) {
-                $file->episodeNumber = $episodeNumber;
+        foreach (['message', 'errorMessage', 'result'] as $key) {
+            $value = $command[$key] ?? null;
+            if (is_string($value) && trim($value) !== '') {
+                return trim($value);
             }
         }
+
+        $body = $command['body'] ?? null;
+        if (is_array($body)) {
+            foreach (['message', 'errorMessage'] as $key) {
+                $value = $body[$key] ?? null;
+                if (is_string($value) && trim($value) !== '') {
+                    return trim($value);
+                }
+            }
+        }
+
+        return '';
+    }
+
+    public function failed(?Throwable $e): void
+    {
+        $download = Download::query()->with('season')->find($this->downloadId);
+        if ($download === null) {
+            return;
+        }
+
+        if ($download->imported_at !== null) {
+            $download->update(['error_message' => $e?->getMessage()]);
+
+            app(AniarrLogger::class)
+                ->forDownload($download)
+                ->withSource('sonarr')
+                ->event(
+                    'download.verification_pending',
+                    '[Sonarr] Импорт выполнен, ожидается подтверждение состояния',
+                    LogType::WARNING,
+                    ['error' => $e?->getMessage()],
+                );
+
+            SyncSeriesWithSonarrJob::dispatch($download->season->series_id)->onQueue('downloads');
+            return;
+        }
+
+        $download->update([
+            'status' => DownloadStatus::FAILED,
+            'failed_at' => now(),
+            'error_message' => $e?->getMessage(),
+        ]);
+
+        app(AniarrLogger::class)
+            ->forDownload($download)
+            ->withSource('sonarr')
+            ->event('download.failed', '[Sonarr] Download завершился ошибкой', LogType::ERROR, [
+                'error' => $e?->getMessage(),
+            ]);
     }
 }

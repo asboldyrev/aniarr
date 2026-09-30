@@ -4,7 +4,6 @@ namespace App\Integrations\QBittorrent;
 
 use App\Integrations\QBittorrent\Dto\File;
 use App\Models\Episode;
-use App\Models\Series;
 use App\Support\EpisodeNumberParser;
 use Illuminate\Support\Collection;
 
@@ -29,7 +28,7 @@ final class TorrentFileSelector
             $name = $file->name;
             $epNum = EpisodeNumberParser::fromFileName($name);
 
-            if ($epNum !== null && $episodes->contains(fn(Episode $episode) => $episode->episode_number == $epNum)) {
+            if ($epNum !== null && $episodes->contains(fn (Episode $episode) => $episode->episode_number == $epNum)) {
                 $toDownload[] = $index;
             }
         }

@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\Status;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -18,27 +17,17 @@ use Illuminate\Support\Carbon;
  * @property string|null $poster_url
  * @property string|null $poster_path
  * @property int|null $year
- * @property Status $status
- * @property Carbon|null $last_updated
+ * @property bool $monitored
+ * @property Carbon|null $last_sonarr_sync_at
  * @property Carbon $created_at
  * @property Carbon $updated_at
- * @property-read Collection<int, Episode> $episodes
+ * @property-read Collection<int, Season> $seasons
  * @property-read Collection<int, ActivityLog> $activityLogs
- * @property-read Collection<int, Torrent> $torrents
- * @property-read Collection<int, Torrent> $hevcTorrents
- * @property-read Collection<int, Torrent> $avcTorrents
- * @property-read Collection<int, RssFeed> $rssFeeds
- * @property-read Collection<int, EpisodeDownload> $episodeDownloads
  */
 class Series extends Model
 {
     use HasFactory;
 
-    /**
-     * Атрибуты, которые можно массово назначать.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'title',
         'sonarr_id',
@@ -47,55 +36,28 @@ class Series extends Model
         'poster_url',
         'poster_path',
         'year',
-        'status',
-        'last_updated',
+        'monitored',
+        'last_sonarr_sync_at',
     ];
 
-    /**
-     * Получает атрибуты, которые должны быть приведены.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
             'sonarr_id' => 'integer',
             'thetvdb_id' => 'integer',
             'year' => 'integer',
-            'status' => Status::class,
-            'last_updated' => 'datetime',
+            'monitored' => 'boolean',
+            'last_sonarr_sync_at' => 'datetime',
         ];
     }
 
-    /**
-     * Получает эпизоды для сериала.
-     */
-    public function episodes(): HasMany
+    public function seasons(): HasMany
     {
-        return $this->hasMany(Episode::class);
+        return $this->hasMany(Season::class);
     }
 
-    /**
-     * Получает логи активности для сериала.
-     */
     public function activityLogs(): HasMany
     {
         return $this->hasMany(ActivityLog::class);
-    }
-
-    /**
-     * Получает торренты для сериала.
-     */
-    public function torrents(): HasMany
-    {
-        return $this->hasMany(Torrent::class);
-    }
-
-    /**
-     * Получает RSS-ленты для сериала.
-     */
-    public function rssFeeds(): HasMany
-    {
-        return $this->hasMany(RssFeed::class);
     }
 }

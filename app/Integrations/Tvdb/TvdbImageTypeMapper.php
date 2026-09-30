@@ -34,6 +34,7 @@ class TvdbImageTypeMapper
     public function map(string $type): string
     {
         $filteredTypeKeys = array_keys($this->types, $type);
+
         return implode(',', $filteredTypeKeys);
     }
 }

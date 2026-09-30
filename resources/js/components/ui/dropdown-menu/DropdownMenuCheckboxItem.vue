@@ -3,7 +3,7 @@
 
     import type { HTMLAttributes } from 'vue'
     import { reactiveOmit } from '@vueuse/core'
-    import { RiCheckLine } from '@remixicon/vue'
+    import { Check } from '@lucide/vue'
     import {
         DropdownMenuCheckboxItem,
         DropdownMenuItemIndicator,
@@ -27,7 +27,7 @@
         <span class="absolute right-2 flex items-center justify-center pointer-events-none" data-slot="dropdown-menu-checkbox-item-indicator">
             <DropdownMenuItemIndicator>
                 <slot name="indicator-icon">
-                    <RiCheckLine />
+                    <Check />
                 </slot>
             </DropdownMenuItemIndicator>
         </span>
